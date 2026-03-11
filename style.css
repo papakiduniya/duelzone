@@ -26,6 +26,7 @@ html, body {
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ── Atmospheric layers ────────────────────────────────── */
@@ -99,6 +100,7 @@ html, body {
   align-items: center;
   padding: 52px 24px 40px;
   gap: 48px;
+  overflow-y: auto;
 }
 
 /* ── Header ────────────────────────────────────────────── */
@@ -11719,6 +11721,7 @@ html {
 body {
   min-height: 100dvh;
   overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
