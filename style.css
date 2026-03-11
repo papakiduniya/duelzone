@@ -9553,8 +9553,8 @@ select {
 .hamburger-btn {
   position: fixed;
   top: 16px;
-  left: 16px;
-  z-index: 1100;
+  right: 16px;
+  z-index: 9999;
   width: 44px;
   height: 44px;
   background: rgba(10,12,22,0.88);
@@ -9635,7 +9635,7 @@ select {
 .dz-dropdown {
   position: fixed;
   top: 72px;
-  left: 16px;        /* anchors to LEFT, same as hamburger */
+  right: 16px;
   width: 252px;
   background: rgba(8,10,20,0.98);
   border: 1px solid rgba(255,255,255,0.1);
@@ -9646,7 +9646,7 @@ select {
   opacity: 0;
   visibility: hidden;
   transform: translateY(-8px) scale(0.97);
-  transform-origin: top left;
+  transform-origin: top right;
   transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.23,1,0.32,1), visibility 0.26s;
   pointer-events: none;
 }
@@ -10420,7 +10420,7 @@ select {
     right: 0;
     margin: 0 auto;
   }
-  .dz-dropdown { left: 10px; right: auto; width: calc(100vw - 20px); }
+  .dz-dropdown { right: 10px; left: auto; width: calc(100vw - 20px); }
   .contact-cards { grid-template-columns: 1fr; }
   .footer-brand { flex-direction: column; text-align: center; }
   .footer-inner { padding: 20px 16px; }
@@ -10548,8 +10548,8 @@ select {
 .hamburger-btn {
   position: fixed;
   top: 16px;
-  left: 16px;
-  z-index: 1100;
+  right: 16px;
+  z-index: 9999;
   width: 46px;
   height: 46px;
   background: rgba(7,8,15,0.85);
@@ -10643,7 +10643,7 @@ select {
 .dz-dropdown {
   position: fixed;
   top: 74px;
-  left: 16px;
+  right: 16px;
   width: 272px;
   background: rgba(6,7,14,0.97);
   border: 1px solid rgba(255,255,255,0.08);
@@ -10657,7 +10657,7 @@ select {
   opacity: 0;
   visibility: hidden;
   transform: translateY(-10px) scale(0.96);
-  transform-origin: top left;
+  transform-origin: top right;
   transition: opacity 0.28s cubic-bezier(0.23,1,0.32,1), transform 0.28s cubic-bezier(0.23,1,0.32,1), visibility 0.28s;
   pointer-events: none;
   backdrop-filter: blur(24px);
@@ -13516,22 +13516,22 @@ canvas {
 }
 
 /* 3-bar hamburger menu: always on far right, never moves */
-.dz-hamburger, #dz-menu-btn, .dz-univ-menu-btn, [id*="hamburger"], [class*="hamburger"] {
-  order: 3 !important;
-  flex-shrink: 0 !important;
-  position: relative !important; /* NOT fixed - stays in flow */
-  z-index: 201 !important;
+/* ══ hamburger always fixed top-right, above ALL game panels ══ */
+#dz-hamburger, .hamburger-btn {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  left: auto !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
-/* Ensure back-to-hub inside games never overlaps menu */
-.dz-game-back-hub, .back-hub-btn, [id$="-back-hub"], [id$="back-hub"] {
-  position: relative !important;
-  z-index: 50 !important;
-}
-
-/* Menu dropdown: fixed position when open, always above everything */
-.dz-menu-dropdown, .dz-side-panel, #dz-nav-panel {
-  z-index: 1000 !important;
+/* Dropdown opens from top-right */
+#dz-dropdown {
+  z-index: 9998 !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -14317,4 +14317,63 @@ body:has(#carrom-play:not(.hidden)) {
   .card-btn {
     flex-shrink: 0;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Territory Wars: direct-tap mobile improvements
+   ══════════════════════════════════════════════════════════════ */
+/* Touch active feedback on capturable cells */
+.tw-cell-capturable:active {
+  background: rgba(255,214,0,0.45) !important;
+  transform: scale(0.95);
+}
+/* Bigger tap target area on mobile */
+@media (pointer: coarse) {
+  .tw-cell {
+    border-radius: 3px;
+  }
+  .tw-cell-capturable {
+    border-color: rgba(255,214,0,0.6);
+    background: rgba(255,214,0,0.16);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HAMBURGER MENU — Always visible, top-right, above ALL panels
+   ══════════════════════════════════════════════════════════════ */
+
+/* Nuclear override — hamburger is ALWAYS on top, no exceptions */
+#dz-hamburger {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  left: auto !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+/* Dropdown opens from top-right */
+#dz-dropdown {
+  position: fixed !important;
+  top: 74px !important;
+  right: 16px !important;
+  left: auto !important;
+  z-index: 99998 !important;
+  transform-origin: top right !important;
+}
+
+/* Give game panel headings right padding so title never hides behind hamburger */
+#mine-play > div:first-child,
+#tetris-play > div:first-child,
+#bm-play > div:first-child,
+#rd-play > div:first-child,
+#tw-play > div:first-child,
+#sdk-play > div:first-child,
+#carrom-play > div:first-child,
+#ludo-play > div:first-child {
+  padding-right: 64px !important;
 }

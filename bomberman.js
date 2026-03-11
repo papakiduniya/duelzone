@@ -12,18 +12,13 @@
 
   function calcCell() {
     var vw = window.innerWidth, vh = window.innerHeight;
-    var isLandscape = vw > vh && vh < 520;
-    var availW, availH;
-    if (isLandscape) {
-      availH = vh - 80;
-      availW = vw - 320; // 150px each side + gaps
-    } else {
-      availW = vw - 320; // 150px each side + gaps
-      availH = vh - 110; // heading + scores + hints
-    }
+    var ctrlH = 150; // height reserved for bottom controls strip
+    var headerH = 90; // heading + scores
+    var availW = vw - 16;
+    var availH = vh - headerH - ctrlH;
     var byW = Math.floor(availW / COLS);
     var byH = Math.floor(availH / ROWS);
-    CELL = Math.max(20, Math.min(56, byW, byH));
+    CELL = Math.max(18, Math.min(52, byW, byH));
   }
   var BOMB_TIMER = 2200; // ms fuse
   var FLAME_DUR = 700;   // ms flame visible
@@ -160,7 +155,7 @@
     bmNewRound();
   }
 
-  // ── Mobile virtual controls ────────────────────────────────────
+  // ── Mobile virtual controls (bottom strip) ─────────────────────
   function bmBuildMobileControls() {
     var p1wrap = el('bm-ctrl-p1');
     var p2wrap = el('bm-ctrl-p2');
@@ -168,8 +163,9 @@
     p1wrap.innerHTML = '';
     if (p2wrap) p2wrap.innerHTML = '';
 
-    var btnSize = '44px';
-    var bombSize = '50px';
+    var btnSize = '52px';
+    var bombSize = '56px';
+    var gap = '3px';
 
     function mkDpad(pid, color) {
       var keys = pid === 0
@@ -179,53 +175,75 @@
       if (!label) return null;
 
       var container = document.createElement('div');
-      container.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;';
+      container.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
 
       var lbl = document.createElement('div');
-      lbl.className = 'dz-ctrl-label';
       lbl.textContent = label;
-      lbl.style.cssText = 'color:' + color + ';font-size:0.75rem;font-weight:700;margin-bottom:2px;';
+      lbl.style.cssText = 'color:' + color + ';font-size:0.7rem;font-weight:700;font-family:Rajdhani,sans-serif;margin-bottom:2px;letter-spacing:0.05em;';
       container.appendChild(lbl);
 
-      function mkBtn(arrow, keyName) {
+      // D-pad + bomb side by side
+      var controls = document.createElement('div');
+      controls.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
+      // D-pad (cross layout)
+      var dpad = document.createElement('div');
+      dpad.style.cssText = 'display:grid;grid-template-columns:repeat(3,'+btnSize+');grid-template-rows:repeat(3,'+btnSize+');gap:'+gap+';';
+
+      function mkBtn(arrow, keyName, gridCol, gridRow) {
         var b = document.createElement('button');
-        b.className = 'dz-dpad-btn';
         b.textContent = arrow;
-        b.style.cssText = 'width:'+btnSize+';height:'+btnSize+';background:rgba(255,255,255,0.08);border:1px solid '+color+'66;color:'+color+';border-radius:8px;font-size:1.1rem;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;display:flex;align-items:center;justify-content:center;';
-        function press(e) { e.preventDefault(); keysDown[keyName] = true; }
-        function release(e) { e.preventDefault(); keysDown[keyName] = false; }
-        b.addEventListener('pointerdown', press);
-        b.addEventListener('pointerup', release);
-        b.addEventListener('pointercancel', release);
-        b.addEventListener('pointerleave', release);
+        b.style.cssText =
+          'grid-column:'+gridCol+';grid-row:'+gridRow+';'
+          + 'width:'+btnSize+';height:'+btnSize+';'
+          + 'background:rgba(255,255,255,0.08);border:1.5px solid '+color+'55;'
+          + 'color:'+color+';border-radius:10px;font-size:1.2rem;cursor:pointer;'
+          + 'touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;'
+          + 'display:flex;align-items:center;justify-content:center;'
+          + 'transition:background 0.08s,transform 0.08s;';
+        function press(e) { e.preventDefault(); keysDown[keyName] = true; b.style.background = color+'33'; b.style.transform='scale(0.9)'; }
+        function release(e) { e.preventDefault(); keysDown[keyName] = false; b.style.background='rgba(255,255,255,0.08)'; b.style.transform='scale(1)'; }
+        b.addEventListener('pointerdown', press, {passive:false});
+        b.addEventListener('pointerup', release, {passive:false});
+        b.addEventListener('pointercancel', release, {passive:false});
+        b.addEventListener('pointerleave', release, {passive:false});
         return b;
       }
-      function mkBombBtn() {
-        var b = document.createElement('button');
-        b.className = 'dz-action-btn';
-        b.textContent = '💣';
-        b.style.cssText = 'width:'+bombSize+';height:'+bombSize+';background:rgba(255,200,0,0.15);border:1px solid '+color+'88;color:'+color+';border-radius:8px;font-size:1.3rem;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;display:flex;align-items:center;justify-content:center;';
-        b.addEventListener('pointerdown', function(e){ e.preventDefault(); bmPlaceBomb(pid); });
-        return b;
-      }
 
-      var upRow = document.createElement('div');
-      upRow.style.cssText = 'display:flex;justify-content:center;';
-      upRow.appendChild(mkBtn('▲', keys.up));
+      // Empty corners, arrow buttons in cross positions
+      dpad.appendChild(mkBtn('▲', keys.up,    2, 1)); // top centre
+      dpad.appendChild(mkBtn('◀', keys.left,  1, 2)); // mid left
+      dpad.appendChild(mkBtn('▼', keys.down,  2, 3)); // bottom centre
+      dpad.appendChild(mkBtn('▶', keys.right, 3, 2)); // mid right
 
-      var midRow = document.createElement('div');
-      midRow.style.cssText = 'display:flex;gap:4px;align-items:center;';
-      midRow.appendChild(mkBtn('◀', keys.left));
-      midRow.appendChild(mkBombBtn());
-      midRow.appendChild(mkBtn('▶', keys.right));
+      // Centre empty cell (visual gap)
+      var centre = document.createElement('div');
+      centre.style.cssText = 'grid-column:2;grid-row:2;border-radius:50%;background:rgba(255,255,255,0.03);border:1px solid '+color+'22;';
+      dpad.appendChild(centre);
 
-      var downRow = document.createElement('div');
-      downRow.style.cssText = 'display:flex;justify-content:center;';
-      downRow.appendChild(mkBtn('▼', keys.down));
+      controls.appendChild(dpad);
 
-      container.appendChild(upRow);
-      container.appendChild(midRow);
-      container.appendChild(downRow);
+      // 💣 Bomb button beside dpad
+      var bombBtn = document.createElement('button');
+      bombBtn.textContent = '💣';
+      bombBtn.style.cssText =
+        'width:'+bombSize+';height:'+bombSize+';'
+        + 'background:rgba(255,200,0,0.12);border:2px solid '+color+'77;'
+        + 'color:'+color+';border-radius:14px;font-size:1.5rem;cursor:pointer;'
+        + 'touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;'
+        + 'display:flex;align-items:center;justify-content:center;'
+        + 'transition:background 0.08s,transform 0.08s;align-self:center;';
+      bombBtn.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        bmPlaceBomb(pid);
+        bombBtn.style.background = 'rgba(255,200,0,0.35)';
+        bombBtn.style.transform = 'scale(0.9)';
+      }, {passive:false});
+      bombBtn.addEventListener('pointerup',     function(){ bombBtn.style.background='rgba(255,200,0,0.12)'; bombBtn.style.transform='scale(1)'; }, {passive:false});
+      bombBtn.addEventListener('pointercancel', function(){ bombBtn.style.background='rgba(255,200,0,0.12)'; bombBtn.style.transform='scale(1)'; }, {passive:false});
+
+      controls.appendChild(bombBtn);
+      container.appendChild(controls);
       return container;
     }
 
@@ -235,6 +253,9 @@
     if (BM.mode === 'pvp' && p2wrap) {
       var p2ctrl = mkDpad(1, '#f50057');
       if (p2ctrl) p2wrap.appendChild(p2ctrl);
+    } else if (p2wrap) {
+      // Bot mode: show keyboard hint in P2 area
+      p2wrap.innerHTML = '<div style="color:rgba(255,255,255,0.2);font-size:0.65rem;font-family:Rajdhani,sans-serif;text-align:center;padding:8px;">🤖 Bot<br>playing</div>';
     }
   }
 

@@ -930,21 +930,20 @@
   display: none !important;
 }
 
-/* 3-bar hamburger menu: always on far right, never moves */
-.dz-hamburger, #dz-menu-btn, .dz-univ-menu-btn, [id*="hamburger"], [class*="hamburger"] {
-  order: 3 !important;
-  flex-shrink: 0 !important;
-  position: relative !important; /* NOT fixed - stays in flow */
-  z-index: 201 !important;
+/* 3-bar hamburger menu: ALWAYS fixed top-right, above every game panel */
+#dz-hamburger, .hamburger-btn {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  left: auto !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
-/* Ensure back-to-hub inside games never overlaps menu */
-.dz-game-back-hub, .back-hub-btn, [id$="-back-hub"], [id$="back-hub"] {
-  position: relative !important;
-  z-index: 50 !important;
-}
-
-/* Menu dropdown: fixed position when open, always above everything */
-.dz-menu-dropdown, .dz-side-panel, #dz-nav-panel {
-  z-index: 1000 !important;
+/* Menu dropdown opens from top-right */
+#dz-dropdown {
+  z-index: 9998 !important;
 }

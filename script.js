@@ -56,6 +56,19 @@ function hideAllScreens() {
 }
 
 function showHub() {
+  // Hide all fixed play panels and back buttons (position:fixed elements escape parent hide)
+  ['mine-play','tetris-play','bm-play','rd-play',
+   'tw-play','sdk-play','carrom-play','ludo-play'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.classList.add('hidden');
+  });
+  ['mine-back-play','tetris-back-play','bm-back-play','rd-back-play',
+   'tw-back-play','sdk-back-play','carrom-back-play','ludo-back-play'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  // Restore body scroll
+  document.body.style.overflow = '';
+  document.body.style.overscrollBehavior = '';
+
   // Show ad interstitial for 3 seconds, then navigate to hub
   var adOverlay    = document.getElementById('dz-ad-interstitial');
   var countdown    = document.getElementById('dz-ad-countdown');
@@ -65,6 +78,8 @@ function showHub() {
     screenHub.classList.remove('hidden');
     SoundManager.backToHub();
     window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   };
   if (adOverlay) {
     adOverlay.style.display = 'flex';
@@ -7651,17 +7666,49 @@ function dzGoHome() {
 function dzNavShowHome() {
   dzCloseMenu();
   dzClosePanels();
-  // Navigate back to hub if currently in a game
-  var hub = document.getElementById('screen-hub');
-  if (hub && hub.classList.contains('hidden')) {
-    document.querySelectorAll('[id^="screen-"]').forEach(function(s) {
-      s.classList.add('hidden');
-    });
-    hub.classList.remove('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // ── Stop every game that could be running in the background ──
+  if (typeof window.mineDestroy      === 'function') window.mineDestroy();
+  if (typeof window.tetrisDestroy    === 'function') window.tetrisDestroy();
+  if (typeof window.bombermanDestroy === 'function') window.bombermanDestroy();
+  if (typeof window.reactionDestroy  === 'function') window.reactionDestroy();
+  if (typeof window.territoryDestroy === 'function') window.territoryDestroy();
+  if (typeof tanksDestroy            === 'function') tanksDestroy();
+  if (typeof scDestroy               === 'function') scDestroy();
+  if (typeof GameLoader !== 'undefined' && GameLoader.getActiveGameId && GameLoader.getActiveGameId()) {
+    if (typeof GameLoader.closeCurrentGame === 'function') GameLoader.closeCurrentGame();
   }
+
+  // ── Force-hide ALL fixed play panels (position:fixed escapes parent hide) ──
+  ['mine-play','tetris-play','bm-play','rd-play',
+   'tw-play','sdk-play','carrom-play','ludo-play'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
+  // ── Hide all floating back buttons ──
+  ['mine-back-play','tetris-back-play','bm-back-play','rd-back-play',
+   'tw-back-play','sdk-back-play','carrom-back-play','ludo-back-play'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // ── Restore body scroll ──
+  document.body.style.overflow = '';
+  document.body.style.overscrollBehavior = '';
+
+  // ── Show hub ──
+  document.querySelectorAll('[id^="screen-"]').forEach(function(s) {
+    s.classList.add('hidden');
+  });
+  var hub = document.getElementById('screen-hub');
+  if (hub) hub.classList.remove('hidden');
+
+  // Force scroll to top — multiple methods for cross-browser reliability
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+
   _dzSetDropdownActive('dd-home-btn');
 }
 

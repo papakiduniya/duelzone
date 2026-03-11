@@ -18,9 +18,9 @@
   var CELL   = 38;
 
   function calcCellSize() {
-    var availW = Math.floor((window.innerWidth - 20) / GRID_W);
-    var availH = Math.floor((window.innerHeight - 120) / GRID_H);
-    CELL = Math.max(22, Math.min(38, availW, availH));
+    var availW = Math.floor((window.innerWidth  - 16) / GRID_W);
+    var availH = Math.floor((window.innerHeight - 155) / GRID_H);
+    CELL = Math.max(18, Math.min(48, availW, availH));
   }
   var EMPTY  = 0, P1 = 1, P2 = 2;
 
@@ -76,11 +76,6 @@
     });
 
     on('tw-end-turn', function () { twEndTurn(); });
-
-    // Build mobile controls (joystick + CLAIM) on touch devices
-    if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
-      buildTwControls();
-    }
   }
 
   function twStop() {
@@ -128,13 +123,6 @@
     twRenderGrid();
     twUpdateUI();
 
-    // Show mobile controls
-    var mCtrl = el('tw-mobile-controls');
-    if (mCtrl && (('ontouchstart' in window) || navigator.maxTouchPoints > 0)) {
-      twUpdateMobileControls();
-      mCtrl.style.display = 'flex';
-    }
-
     // Request landscape orientation when game starts
     if (typeof window.dzLockLandscape    === 'function') window.dzLockLandscape();
     if (typeof window.dzCheckOrientation === 'function') window.dzCheckOrientation();
@@ -164,15 +152,6 @@
           else if (isCapturable) {
             cell.className  += ' tw-cell-capturable';
             cell.style.cursor = 'pointer';
-          }
-
-          // Joystick cursor highlight ring
-          if (isCursor && isCapturable) {
-            var col2 = TW.turn === P1 ? '#00e5ff' : '#f50057';
-            cell.style.outline       = '2.5px solid ' + col2;
-            cell.style.outlineOffset = '-2px';
-            cell.style.background    = TW.turn === P1 ? 'rgba(0,229,255,0.25)' : 'rgba(245,0,87,0.25)';
-            cell.style.zIndex        = '2';
           }
 
           cell.addEventListener('click', function () { twClickCell(row, col); });
@@ -291,7 +270,7 @@
 
     twUpdateUI();
     twRenderGrid();
-    twUpdateMobileControls();
+    
 
     // FIX: immediately check if the player whose turn just started has any moves
     if (twCheckEndConditions()) return;
@@ -332,7 +311,7 @@
     var total = GRID_W * GRID_H;
     setText('tw-total', TW.scores[0] + TW.scores[1] + '/' + total + ' cells claimed');
 
-    twUpdateMobileControls();
+    
   }
 
   // ── End game ──────────────────────────────────────────────────
@@ -521,234 +500,5 @@
     return null;
   }
 
-  // ── Mobile joystick controls ──────────────────────────────────
-  /*
-   * Joystick navigates a cursor around the grid.
-   * Analog drag → discrete step every REPEAT_MS when held past THRESHOLD.
-   * CLAIM button calls twClickCell at cursor position.
-   * In PvP both players get a stick; only active player's stick moves cursor.
-   * Bot mode shows P1 stick only.
-   */
-  var twJoyRepeatTimer = null;
-  var twJoyDir = { dx: 0, dy: 0, active: false };
-
-  function buildTwControls() {
-    var container = document.getElementById('tw-mobile-controls');
-    if (!container) return;
-    container.innerHTML = '';
-
-    var isLandscape = window.innerWidth > window.innerHeight && window.innerHeight < 520;
-    var joySize  = isLandscape ? 76 : 90;
-    var claimH   = isLandscape ? 38 : 48;
-    var gap      = isLandscape ? 4  : 8;
-    var padding  = isLandscape ? '3px 12px' : '8px 14px';
-
-    container.style.cssText =
-      'display:flex;justify-content:space-between;align-items:center;'
-      + 'gap:12px;padding:' + padding + ';box-sizing:border-box;width:100%;'
-      + 'background:rgba(7,8,15,0.94);border-top:1px solid rgba(255,214,0,0.12);'
-      + 'user-select:none;-webkit-user-select:none;';
-
-    var isPvP = TW.mode === 'pvp';
-
-    if (isPvP) {
-      // P1 stick (left)
-      container.appendChild(mkTwJoySet('🔵 P1', '#00e5ff', 1, joySize, claimH, gap));
-      // Centre divider
-      var divEl = document.createElement('div');
-      divEl.style.cssText = 'width:1px;height:60px;background:rgba(255,255,255,0.07);flex-shrink:0;';
-      container.appendChild(divEl);
-      // P2 stick (right)
-      container.appendChild(mkTwJoySet('🔴 P2', '#f50057', 2, joySize, claimH, gap));
-    } else {
-      // Bot mode: one centred stick
-      var inner = document.createElement('div');
-      inner.style.cssText = 'flex:1;display:flex;justify-content:center;';
-      inner.appendChild(mkTwJoySet('🔵 P1', '#00e5ff', 1, joySize, claimH, gap));
-      container.appendChild(inner);
-    }
-  }
-
-  function mkTwJoySet(label, color, playerNum, joySize, claimH, gap) {
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;gap:' + gap + 'px;';
-
-    // Label
-    var lbl = document.createElement('span');
-    lbl.textContent = label;
-    lbl.style.cssText =
-      'font-family:Rajdhani,sans-serif;font-size:10px;color:' + color
-      + ';letter-spacing:1.5px;text-transform:uppercase;';
-    wrap.appendChild(lbl);
-
-    // Row: joystick + CLAIM button
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;';
-
-    // Joystick base
-    var knobSize = Math.round(joySize * 0.42);
-    var base = document.createElement('div');
-    base.style.cssText =
-      'position:relative;width:' + joySize + 'px;height:' + joySize + 'px;border-radius:50%;'
-      + 'border:2.5px solid ' + color + '55;background:' + color + '08;'
-      + 'touch-action:none;cursor:pointer;flex-shrink:0;';
-
-    var knob = document.createElement('div');
-    knob.style.cssText =
-      'position:absolute;top:50%;left:50%;'
-      + 'transform:translate(-50%,-50%);'
-      + 'width:' + knobSize + 'px;height:' + knobSize + 'px;border-radius:50%;pointer-events:none;'
-      + 'background:radial-gradient(circle at 38% 36%,' + color + 'bb,' + color + '33);'
-      + 'border:2px solid ' + color + '99;'
-      + 'box-shadow:0 0 10px ' + color + '55;';
-    base.appendChild(knob);
-    wireTwJoystick(base, knob, playerNum, joySize, color);
-
-    // CLAIM button
-    var claim = document.createElement('button');
-    claim.textContent = '✔ CLAIM';
-    claim.style.cssText =
-      'height:' + claimH + 'px;padding:0 14px;'
-      + 'background:' + color + '18;border:2px solid ' + color + '77;border-radius:10px;'
-      + 'color:' + color + ';font-family:Rajdhani,sans-serif;font-weight:700;'
-      + 'font-size:13px;cursor:pointer;touch-action:none;'
-      + 'user-select:none;-webkit-tap-highlight-color:transparent;'
-      + 'transition:background 0.08s,transform 0.08s;flex-shrink:0;';
-    claim.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-
-    // CLAIM fires only on the active player's button
-    claim.addEventListener('pointerdown', function(e) {
-      e.preventDefault();
-      if (TW.over) return;
-      if (TW.mode === 'bot' && TW.turn === P2) return;
-      if (TW.turn !== playerNum) return;
-      var cr = TW.cursor.r, cc = TW.cursor.c;
-      if (TW.grid[cr][cc] === EMPTY && isAdjacent(cr, cc, TW.turn)) {
-        claim.style.background = color + '33';
-        claim.style.transform  = 'scale(0.93)';
-        twClickCell(cr, cc);
-      }
-    }, {passive:false});
-    claim.addEventListener('pointerup',     function(){ claim.style.background=color+'18'; claim.style.transform='scale(1)'; }, {passive:false});
-    claim.addEventListener('pointercancel', function(){ claim.style.background=color+'18'; claim.style.transform='scale(1)'; }, {passive:false});
-
-    row.appendChild(base);
-    row.appendChild(claim);
-    wrap.appendChild(row);
-    return wrap;
-  }
-
-  function wireTwJoystick(base, knob, playerNum, joySize, color) {
-    var RADIUS    = joySize * 0.36;
-    var THRESHOLD = 0.45;   // fraction of RADIUS to trigger a step
-    var REPEAT_MS = 180;    // ms between repeated steps when held
-
-    var active = false, pointerId = -1, cx = 0, cy = 0;
-    var lastDir = { dr: 0, dc: 0 };
-
-    function stepCursor(dr, dc) {
-      // Only move cursor if this player's turn
-      if (TW.over) return;
-      if (TW.mode === 'bot' && TW.turn === P2) return;
-      if (TW.turn !== playerNum) return;
-
-      var nr = TW.cursor.r + dr;
-      var nc = TW.cursor.c + dc;
-      // Clamp to grid
-      nr = Math.max(0, Math.min(GRID_H - 1, nr));
-      nc = Math.max(0, Math.min(GRID_W  - 1, nc));
-      if (nr !== TW.cursor.r || nc !== TW.cursor.c) {
-        TW.cursor.r = nr;
-        TW.cursor.c = nc;
-        twRenderGrid();
-        // Auto-scroll cursor cell into view
-        var gridEl = document.getElementById('tw-grid');
-        if (gridEl) {
-          var idx = nr * GRID_W + nc;
-          var cellEl = gridEl.children[idx];
-          if (cellEl && cellEl.scrollIntoView) {
-            cellEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-          }
-        }
-      }
-    }
-
-    function startRepeat(dr, dc) {
-      clearInterval(twJoyRepeatTimer);
-      lastDir = { dr: dr, dc: dc };
-      stepCursor(dr, dc);
-      twJoyRepeatTimer = setInterval(function() {
-        if (!active) { clearInterval(twJoyRepeatTimer); return; }
-        stepCursor(lastDir.dr, lastDir.dc);
-      }, REPEAT_MS);
-    }
-
-    function stopRepeat() {
-      clearInterval(twJoyRepeatTimer);
-      twJoyRepeatTimer = null;
-    }
-
-    function getDir(dx, dy) {
-      var dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist < RADIUS * THRESHOLD) return { dr: 0, dc: 0 };
-      // Pick strongest axis
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        return { dr: 0, dc: dx > 0 ? 1 : -1 };
-      } else {
-        return { dr: dy > 0 ? 1 : -1, dc: 0 };
-      }
-    }
-
-    function updateKnob(dx, dy) {
-      var dist  = Math.sqrt(dx*dx + dy*dy);
-      var clamp = Math.min(dist, RADIUS);
-      var kx = dist > 0 ? (dx/dist)*clamp : 0;
-      var ky = dist > 0 ? (dy/dist)*clamp : 0;
-      knob.style.transform = 'translate(calc(-50% + ' + kx + 'px), calc(-50% + ' + ky + 'px))';
-    }
-
-    base.addEventListener('pointerdown', function(e) {
-      e.preventDefault();
-      base.setPointerCapture(e.pointerId);
-      active = true; pointerId = e.pointerId;
-      var r = base.getBoundingClientRect();
-      cx = r.left + r.width/2;
-      cy = r.top  + r.height/2;
-      updateKnob(0, 0);
-    }, {passive:false});
-
-    base.addEventListener('pointermove', function(e) {
-      if (!active || e.pointerId !== pointerId) return;
-      e.preventDefault();
-      var dx = e.clientX - cx, dy = e.clientY - cy;
-      updateKnob(dx, dy);
-      var dir = getDir(dx, dy);
-      if (dir.dr !== lastDir.dr || dir.dc !== lastDir.dc) {
-        stopRepeat();
-        if (dir.dr !== 0 || dir.dc !== 0) startRepeat(dir.dr, dir.dc);
-        else lastDir = { dr: 0, dc: 0 };
-      }
-    }, {passive:false});
-
-    function endJoy(e) {
-      if (e.pointerId !== pointerId) return;
-      active = false; pointerId = -1;
-      knob.style.transform = 'translate(-50%,-50%)';
-      lastDir = { dr: 0, dc: 0 };
-      stopRepeat();
-    }
-    base.addEventListener('pointerup',     endJoy, {passive:false});
-    base.addEventListener('pointercancel', endJoy, {passive:false});
-  }
-
-  // Show/hide & dim inactive player's controls
-  function twUpdateMobileControls() {
-    var container = document.getElementById('tw-mobile-controls');
-    if (!container || container.style.display === 'none') return;
-    var isBotTurn = TW.mode === 'bot' && TW.turn === P2;
-    // Dim entire panel during bot turn
-    container.style.opacity = isBotTurn ? '0.35' : '1';
-    container.style.pointerEvents = isBotTurn ? 'none' : '';
-  }
 
 })();

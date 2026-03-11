@@ -4241,22 +4241,29 @@
 
     <div id="bm-play" class="hidden" style="position:fixed;inset:0;background:#07080f;box-sizing:border-box;display:flex;flex-direction:column;font-family:'Rajdhani',sans-serif;overflow:hidden;z-index:50;">
 
-      <!-- Heading at very top, centered -->
+      <!-- Heading -->
       <div style="text-align:center;padding:8px 0 4px;flex-shrink:0;">
         <h1 style="margin:0;font-family:'Orbitron',sans-serif;font-size:1.15rem;font-weight:900;letter-spacing:0.13em;background:linear-gradient(90deg,#ff6d00,#ffaa00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:inline-block;">💥 BOMBERMAN DUEL</h1>
       </div>
 
+      <!-- Scores -->
       <div style="display:flex;justify-content:center;gap:40px;padding:0 12px;margin-bottom:4px;font-size:0.9rem;flex-shrink:0;">
         <span style="color:#00e5ff;font-weight:700;">🔵 Player 1 <span id="bm-score-p1">⭐ 0</span></span>
         <span style="color:#f50057;font-weight:700;" id="bm-p2-name">🔴 Player 2</span>
         <span style="color:#f50057;font-weight:700;"><span id="bm-score-p2">⭐ 0</span></span>
       </div>
-      <div style="display:flex;justify-content:center;align-items:center;flex:1;min-height:0;gap:10px;padding:0 8px;">
-        <div id="bm-ctrl-p1" style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:150px;"></div>
-        <canvas id="bm-canvas" style="border:1.5px solid rgba(255,109,0,0.3);border-radius:6px;max-height:100%;display:block;flex-shrink:0;"></canvas>
-        <div id="bm-ctrl-p2" style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:150px;"></div>
+
+      <!-- Canvas — fills all available space between scores and controls -->
+      <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 8px;">
+        <canvas id="bm-canvas" style="border:1.5px solid rgba(255,109,0,0.3);border-radius:6px;max-width:100%;max-height:100%;display:block;"></canvas>
       </div>
-      <div style="text-align:center;padding:4px 0;font-size:0.7rem;color:rgba(255,255,255,0.3);flex-shrink:0;">P1: WASD + Space · P2: Arrows + Enter</div>
+
+      <!-- Bottom controls strip — P1 left, P2 right -->
+      <div id="bm-ctrl-strip" style="flex-shrink:0;display:flex;justify-content:space-around;align-items:flex-end;padding:6px 12px 10px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,109,0,0.1);">
+        <div id="bm-ctrl-p1" style="display:flex;align-items:center;justify-content:center;"></div>
+        <div id="bm-ctrl-p2" style="display:flex;align-items:center;justify-content:center;"></div>
+      </div>
+
       <div id="bm-result" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);z-index:99;">
         <div style="background:#0d0f1c;border:2px solid #ff6d00;border-radius:16px;padding:40px 48px;text-align:center;max-width:360px;">
           <div id="bm-result-title" style="font-size:1.7rem;font-weight:900;color:#fff;font-family:'Orbitron',sans-serif;margin-bottom:8px;"></div>
@@ -4413,14 +4420,12 @@
         <div id="tw-p2-name" style="color:#f50057;font-weight:700;">🔴 P2: <span id="tw-score-p2">0</span></div>
       </div>
       <div id="tw-total" style="text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.35);padding:0 12px 6px;"></div>
-      <div style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:flex-start;justify-content:center;padding:0 8px;">
+      <div style="flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:center;justify-content:center;padding:0 4px;">
         <div id="tw-grid" style="display:grid;gap:2px;width:fit-content;margin:0 auto;"></div>
       </div>
-      <div style="text-align:center;padding:6px 12px 4px;">
-        <button id="tw-end-turn" style="padding:8px 24px;background:rgba(255,214,0,0.15);border:1.5px solid #ffd600;border-radius:8px;color:#ffd600;font-family:'Orbitron',sans-serif;font-size:0.8rem;cursor:pointer;">END TURN →</button>
+      <div style="text-align:center;padding:6px 12px 8px;flex-shrink:0;">
+        <button id="tw-end-turn" style="padding:10px 32px;background:rgba(255,214,0,0.15);border:1.5px solid #ffd600;border-radius:8px;color:#ffd600;font-family:'Orbitron',sans-serif;font-size:0.8rem;cursor:pointer;letter-spacing:0.08em;">END TURN →</button>
       </div>
-      <!-- Territory mobile controls: joystick + CLAIM, populated by territory.js -->
-      <div id="tw-mobile-controls" style="display:none;width:100%;"></div>
 
       <div id="tw-result" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);z-index:99;">
         <div style="background:#0d0f1c;border:2px solid #ffd600;border-radius:16px;padding:40px 48px;text-align:center;max-width:360px;">
