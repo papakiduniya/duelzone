@@ -138,7 +138,7 @@ function showC4() {
 function showCricket() {
   hideAllScreens();
   screenCricket.classList.remove('hidden');
-  cricketResetToSetup();
+  cricResetToSetup();   // cancels all timers + full reset
   window.scrollTo(0, 0);
 }
 
@@ -771,6 +771,8 @@ hubCards.forEach(function(card) {
 
   card.addEventListener('click', function(evt) {
     if (overlay.classList.contains('active')) return;
+    if (evt.target.closest('.card-setup-btn')) return;
+    if (evt.target.closest('.card-save-btn'))  return;
 
     var gameName    = card.getAttribute('data-game');
     var accentColor = getComputedStyle(card).getPropertyValue('--accent').trim();
@@ -2186,6 +2188,22 @@ var cricPvpPhase      = 1;      // 1=batter picking, 2=bowler picking
 // Bot intelligence
 var cricPlayerHistory = [];
 
+// ── Pending-timeout safety — all timers register here so they can be
+//    cancelled instantly when the user navigates away or resets ─────
+var _cricTimers = [];
+function cricSafeTimeout(fn, ms) {
+  var id = setTimeout(function() {
+    _cricTimers = _cricTimers.filter(function(t){ return t !== id; });
+    fn();
+  }, ms);
+  _cricTimers.push(id);
+  return id;
+}
+function cricCancelTimers() {
+  _cricTimers.forEach(clearTimeout);
+  _cricTimers = [];
+}
+
 // ── DOM refs ───────────────────────────────────────────────────
 var cricSetupEl    = document.getElementById('cricket-setup');
 var cricTossEl     = document.getElementById('cricket-toss');
@@ -2230,6 +2248,9 @@ function cricShowOnly(el) {
     e.classList.add('hidden');
   });
   el.classList.remove('hidden');
+  // Show "← Setup" only when NOT on the setup screen
+  var backBtn = document.getElementById('cricket-back-btn');
+  if (backBtn) backBtn.style.display = (el === cricSetupEl) ? 'none' : '';
 }
 
 function cricNumPop(el) {
@@ -2405,13 +2426,13 @@ function cricEndInnings() {
     cricPlayBNum.textContent = '?';
     cricPlayResult.textContent = '🔁 Innings over — ' + cricBatterName() + ' bats now!';
     if (cricIsPvP) {
-      setTimeout(function() {
+      cricSafeTimeout(function() {
         cricPlayResult.textContent = '—';
         cricPvpResetBall();
       }, 1200);
     } else {
       cricPlayPrompt.textContent = cricPlayerBats ? 'Your turn to bat:' : 'Your turn to bowl:';
-      setTimeout(function() {
+      cricSafeTimeout(function() {
         cricPlayResult.textContent = '—';
         cricSetNumpadDisabled(false);
       }, 1200);
@@ -2433,17 +2454,17 @@ function cricShowResult() {
     cricResTrophy.textContent = '🤝';
     cricResTitle.textContent  = "IT'S A TIE!";
     cricResSub.textContent    = 'Incredible — dead heat!';
-    setTimeout(function() { SoundManager.draw(); }, 200);
+    cricSafeTimeout(function() { SoundManager.draw(); }, 200);
   } else if (p1s > p2s) {
     cricResTrophy.textContent = '🏆';
     cricResTitle.textContent  = p1n.toUpperCase() + ' WIN' + (cricIsPvP ? 'S' : '') + '!';
     cricResSub.textContent    = 'Won by ' + (p1s - p2s) + ' run' + ((p1s - p2s) !== 1 ? 's' : '') + '!';
-    setTimeout(function() { SoundManager.win(); }, 200);
+    cricSafeTimeout(function() { SoundManager.win(); }, 200);
   } else {
     cricResTrophy.textContent = cricIsPvP ? '🏆' : '💀';
     cricResTitle.textContent  = p2n.toUpperCase() + ' WIN' + (cricIsPvP ? 'S' : '') + '!';
     cricResSub.textContent    = p2n + ' won by ' + (p2s - p1s) + ' run' + ((p2s - p1s) !== 1 ? 's' : '') + '!';
-    setTimeout(function() { cricIsPvP ? SoundManager.win() : SoundManager.lose(); }, 200);
+    cricSafeTimeout(function() { cricIsPvP ? SoundManager.win() : SoundManager.lose(); }, 200);
   }
 
   cricFinalYou.textContent = p1n + ': ' + p1s;
@@ -2469,7 +2490,7 @@ function cricHandlePlay(playerNum) {
   cricPlayBNum.textContent = '...';
   cricNumPop(cricPlayPNum);
 
-  setTimeout(function() {
+  cricSafeTimeout(function() {
     cricPlayBNum.textContent = botNum;
     cricNumPop(cricPlayBNum);
 
@@ -2488,7 +2509,7 @@ function cricResolveRound(batterNum, bowlerNum, isOut, runs) {
     cricAddBatterWkt();
     cricPlayResult.textContent = '🚨 ' + cricBatterName() + ' OUT!';
     cricPlayResult.classList.add('out-flash');
-    setTimeout(function() { cricPlayResult.classList.remove('out-flash'); }, 1500);
+    cricSafeTimeout(function() { cricPlayResult.classList.remove('out-flash'); }, 1500);
     cricUpdateScoreboard();
 
     var wktsFallen = cricGetBatterWkts();
@@ -2497,9 +2518,9 @@ function cricResolveRound(batterNum, bowlerNum, isOut, runs) {
     if (cricInnings === 2 && cricGetBatterScore() > cricTarget) { cricShowResult(); return; }
 
     if (allOut) {
-      setTimeout(cricEndInnings, 1000);
+      cricSafeTimeout(cricEndInnings, 1000);
     } else {
-      setTimeout(function() {
+      cricSafeTimeout(function() {
         cricPlayResult.textContent = '—';
         if (cricIsPvP) cricPvpResetBall();
         else { cricPlayPNum.textContent = '?'; cricPlayBNum.textContent = '?'; cricSetNumpadDisabled(false); }
@@ -2513,9 +2534,9 @@ function cricResolveRound(batterNum, bowlerNum, isOut, runs) {
     cricRound++;
     cricUpdateScoreboard();
 
-    if (cricInnings === 2 && cricGetBatterScore() > cricTarget) { setTimeout(cricShowResult, 600); return; }
+    if (cricInnings === 2 && cricGetBatterScore() > cricTarget) { cricSafeTimeout(cricShowResult, 600); return; }
 
-    setTimeout(function() {
+    cricSafeTimeout(function() {
       cricPlayResult.textContent = '—';
       if (cricIsPvP) cricPvpResetBall();
       else { cricPlayPNum.textContent = '?'; cricPlayBNum.textContent = '?'; cricSetNumpadDisabled(false); }
@@ -2601,7 +2622,7 @@ document.querySelectorAll('.cric-pvp-p2-btn').forEach(function(btn) {
     var pp2 = document.getElementById('cric-pvp-pp2');
     if (pp2) pp2.classList.add('hidden');
 
-    setTimeout(function() {
+    cricSafeTimeout(function() {
       if (p1IsP1Batting) {
         cricPlayBNum.textContent = bowlerPick;
       } else {
@@ -2668,7 +2689,7 @@ document.querySelectorAll('.cric-pvp-toss-p2-btn').forEach(function(btn) {
     if (p1n === p2n) {
       if (msg) msg.textContent = p1n + ' = ' + p2n + ' — TIE! Re-toss...';
       cricPvpTossP1Num = null;
-      setTimeout(function() {
+      cricSafeTimeout(function() {
         reveal.classList.add('hidden');
         document.getElementById('cric-pvp-t-pass').classList.add('hidden');
         var t1 = document.getElementById('cric-pvp-t1');
@@ -2711,14 +2732,30 @@ var CRIC_MODE_DESCS = {
 };
 
 function cricResetToSetup() {
-  cricMode         = 'normal';
-  cricDiff         = 'easy';
-  cricWickets      = 3;
-  cricTossOE       = null;
-  cricIsPvP        = false;
-  cricPvpTossP1Num = null;
-  cricPlayerHistory = [];
+  // ── Kill any in-flight animation timers immediately ──────────
+  cricCancelTimers();
 
+  // ── Full state reset ──────────────────────────────────────────
+  cricMode          = 'normal';
+  cricDiff          = 'easy';
+  cricWickets       = 3;
+  cricTossOE        = null;
+  cricIsPvP         = false;
+  cricPvpTossP1Num  = null;
+  cricPlayerHistory = [];
+  cricNumpadLocked  = false;
+
+  // Match state
+  cricPlayerBats  = true;
+  cricInnings     = 1;
+  cricTarget      = null;
+  cricP1Score     = 0;  cricP2Score    = 0;  cricBotScore   = 0;
+  cricP1Wickets   = 0;  cricP2Wickets  = 0;  cricBotWickets = 0;
+  cricRound       = 1;
+  cricPvpBatterPick = null;
+  cricPvpPhase      = 1;
+
+  // ── Restore setup UI buttons ──────────────────────────────────
   document.getElementById('cric-normal-btn').classList.add('active');
   document.getElementById('cric-crazy-btn').classList.remove('active');
   document.getElementById('cric-easy-btn').classList.add('active');
@@ -2733,13 +2770,20 @@ function cricResetToSetup() {
   cricWktDisp.textContent = '3';
   if (cricModeDesc) cricModeDesc.textContent = CRIC_MODE_DESCS.normal;
 
-  // Reset bot toss
+  // ── Restore toss UI ───────────────────────────────────────────
   if (cricOEBtns)    cricOEBtns.classList.remove('hidden');
   document.getElementById('cric-odd-btn').classList.remove('active');
   document.getElementById('cric-even-btn').classList.remove('active');
-  if (cricTossNumpad) cricTossNumpad.classList.add('hidden');
-  if (cricTossResult) cricTossResult.classList.add('hidden');
+  if (cricTossNumpad)  cricTossNumpad.classList.add('hidden');
+  if (cricTossResult)  cricTossResult.classList.add('hidden');
   if (cricBatBowlBtns) cricBatBowlBtns.classList.add('hidden');
+
+  // Re-enable any locked numpad buttons
+  cricSetNumpadDisabled(false);
+
+  // Re-enable PvP toss buttons (may have been disabled mid-toss)
+  document.querySelectorAll('.cric-pvp-toss-p1-btn, .cric-pvp-toss-p2-btn').forEach(function(b){ b.classList.remove('disabled'); });
+  document.querySelectorAll('.cric-pvp-p1-btn, .cric-pvp-p2-btn').forEach(function(b){ b.classList.remove('disabled'); });
 
   cricShowOnly(cricSetupEl);
 }
@@ -2913,7 +2957,7 @@ document.querySelectorAll('.cric-bot-toss-btn').forEach(function(btn) {
     if (playerWon) {
       cricBatBowlBtns.classList.remove('hidden');
     } else {
-      setTimeout(function() {
+      cricSafeTimeout(function() {
         // Bot makes a smart toss decision based on difficulty
         var botBatsFirst;
         if (cricDiff === 'easy') {
@@ -2927,7 +2971,7 @@ document.querySelectorAll('.cric-bot-toss-btn').forEach(function(btn) {
         cricTossWinner.textContent += ' Bot chooses to ' + (botBatsFirst ? 'BAT.' : 'BOWL.');
         cricBatBowlBtns.classList.add('hidden');
         // botBatsFirst=true means bot bats → P1 (player) does NOT bat first
-        setTimeout(function() { cricStartMatch(!botBatsFirst); }, 1000);
+        cricSafeTimeout(function() { cricStartMatch(!botBatsFirst); }, 1000);
       }, 800);
     }
   });
@@ -2948,8 +2992,16 @@ document.querySelectorAll('#cric-play-numpad .cricket-num-btn').forEach(function
 // Play again
 document.getElementById('cric-play-again').addEventListener('click', function() { cricResetToSetup(); });
 
-// Back button
-document.getElementById('cricket-back-btn').addEventListener('click', function() { showHub(); });
+// "← Setup" button — shown during toss/play/result, goes back to setup screen
+document.getElementById('cricket-back-btn').addEventListener('click', function() {
+  cricResetToSetup();
+});
+
+// "← Hub" button — inside setup screen only
+document.getElementById('cricket-hub-btn').addEventListener('click', function() {
+  cricCancelTimers();
+  showHub();
+});
 
 console.log('[DuelZone] Hand Cricket — PvP + Bot modes ready!');
 
@@ -6570,8 +6622,8 @@ var GlobalBotEngine = (function() {
     gameId:      'cricket',
     containerId: 'screen-cricket',
     init:   function() {},
-    start:  function() { cricketResetToSetup(); },
-    reset:  function() { cricketResetToSetup(); },
+    start:  function() { cricResetToSetup(); },
+    reset:  function() { cricResetToSetup(); },
     destroy: function() {
       cricNumpadLocked = true;
     }

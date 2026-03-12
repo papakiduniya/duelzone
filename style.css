@@ -314,6 +314,8 @@ html, body {
   align-items: flex-start;
   gap: 16px;
   padding: 28px 28px 24px;
+  /* Extra right padding keeps card-actions clear of the absolute-positioned bookmark button */
+  padding-right: 50px;
 }
 
 /* Icon wrapper */
@@ -413,6 +415,23 @@ html, body {
 
 .btn-arrow {
   transition: transform var(--transition);
+}
+
+/* ── Card Actions Row (PLAY + SETUP side by side) ───────── */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Setup (⚙) button on hub cards ─────────────────────── */
+.card-setup-btn {
+  display: none; /* hidden on desktop — shown only on mobile via media query */
+}
+.arena-card .card-setup-btn {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 /* ── Per-color card hover glow (matches reference data-color attrs) ── */
@@ -658,11 +677,36 @@ html, body {
     padding: 0 2px;
   }
   #screen-hub { padding: 64px 12px 32px !important; gap: 28px; }
-  .card-inner { padding: 18px 16px 16px; gap: 12px; }
+  .card-inner { padding: 18px 16px 16px; padding-right: 44px; gap: 12px; }
   .card-icon  { width: 52px; height: 52px; border-radius: 12px; }
   .card-title { font-size: 0.9rem; }
   .card-desc  { font-size: 0.78rem; }
   .card-btn   { padding: 8px 14px; font-size: 0.64rem; }
+  .card-setup-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.45);
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+  }
+  .arena-card .card-setup-btn {
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    color: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .arena-card .card-setup-btn:active {
+    transform: rotate(45deg) scale(0.95);
+  }
+  .card-setup-btn svg { width: 11px; height: 11px; }
   .sword      { font-size: 1.5rem; }
   #title      { font-size: clamp(2rem, 8vw, 3.5rem); }
 }
@@ -671,15 +715,18 @@ html, body {
 @media (max-width: 480px) {
   #screen-hub { padding: 60px 10px 24px !important; gap: 20px; }
   #arena-grid { gap: 10px; }
-  .card-inner { padding: 14px 12px 12px; gap: 9px; }
+  .card-inner { padding: 14px 12px 12px; padding-right: 40px; gap: 9px; }
   .card-icon  { width: 42px; height: 42px; border-radius: 10px; }
   .card-icon svg { width: 24px !important; height: 24px !important; }
   .card-title { font-size: 0.8rem; letter-spacing: 0.02em; margin-bottom: 3px; }
   .card-desc  { font-size: 0.7rem; display: none; }
   .card-btn   { padding: 7px 10px; font-size: 0.58rem; letter-spacing: 0.1em; }
   .card-btn .btn-arrow { display: none; }
-  .card-save-btn { width: 26px; height: 26px; top: 6px; right: 6px; }
+  .card-save-btn { width: 26px; height: 26px; bottom: 8px; right: 8px; top: auto; }
   .card-save-btn svg { width: 12px; height: 12px; }
+  .card-setup-btn { width: 22px; height: 22px; border-radius: 6px; }
+  .card-setup-btn svg { width: 10px; height: 10px; }
+  .card-actions { gap: 6px; }
   #title      { font-size: clamp(1.7rem, 9vw, 2.4rem); letter-spacing: 0.08em; }
   #subtitle   { font-size: 0.62rem; letter-spacing: 0.28em; }
   .sword      { display: none; }
@@ -688,7 +735,7 @@ html, body {
 /* Tiny phones (≤360px) — minimum sizes */
 @media (max-width: 360px) {
   #arena-grid { gap: 8px; }
-  .card-inner { padding: 11px 10px 10px; gap: 7px; }
+  .card-inner { padding: 11px 10px 10px; padding-right: 36px; gap: 7px; }
   .card-icon  { width: 36px; height: 36px; }
   .card-title { font-size: 0.72rem; }
   #title      { font-size: 1.6rem; }
@@ -6505,7 +6552,9 @@ html, body {
 
 /* ── Controls ────────────────────────────────────────────────── */
 #bs-controls {
-  text-align: center;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
   margin-top: 0.75rem;
 }
 
@@ -6924,7 +6973,9 @@ html, body {
 
 /* ── Controls ─────────────────────────────────────────────── */
 #ck-controls {
-  text-align: center;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
   margin-top: 0.5rem;
 }
 
@@ -7993,7 +8044,7 @@ html, body {
 }
 
 /* Chess: Undo / Hint buttons */
-#chess-undo-btn, #chess-hint-btn {
+#chess-undo-btn, #chess-hint-btn, #chess-setup-btn {
   background: rgba(255,255,255,0.08);
   border: 1.5px solid rgba(255,255,255,0.18);
   color: #e2e8f0;
@@ -8005,8 +8056,9 @@ html, body {
   font-family: 'Rajdhani', sans-serif;
   letter-spacing: 0.05em;
 }
-#chess-undo-btn:hover { background: rgba(100,150,255,0.18); border-color: #6496ff; }
-#chess-hint-btn:hover { background: rgba(255,215,0,0.18);   border-color: #ffd700; }
+#chess-undo-btn:hover  { background: rgba(100,150,255,0.18); border-color: #6496ff; }
+#chess-hint-btn:hover  { background: rgba(255,215,0,0.18);   border-color: #ffd700; }
+#chess-setup-btn:hover { background: rgba(245,197,24,0.18);  border-color: #f5c518; color: #f5c518; }
 
 /* ── Battleship: Radar ping on miss ──────────────────────── */
 .bs-radar-ping {
@@ -8949,7 +9001,8 @@ select {
 
   #chess-reset-btn,
   #chess-undo-btn,
-  #chess-hint-btn {
+  #chess-hint-btn,
+  #chess-setup-btn {
     flex: 1;
     min-width: 0;
     min-height: 44px;
@@ -9922,8 +9975,9 @@ select {
    ══════════════════════════════════════════════════════════ */
 .card-save-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: auto;
+  bottom: 14px;
+  right: 14px;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -10419,8 +10473,9 @@ select {
 /* ── Card save button (added fix) ── */
 .card-save-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: auto;
+  bottom: 14px;
+  right: 14px;
   width: 30px;
   height: 30px;
   background: rgba(0,0,0,0.45);
@@ -13319,14 +13374,14 @@ canvas {
     display:flex; align-items:center; justify-content:space-between;
     padding:12px 16px 4px; box-sizing:border-box;
   }
-  #pp-back-btn, #pp-pause-btn {
+  #pp-back-btn, #pp-setup-btn, #pp-pause-btn {
     background:none; border:1.5px solid rgba(0,229,255,.3); color:#00e5ff;
     font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:700;
     padding:7px 14px; border-radius:8px; cursor:pointer; letter-spacing:.06em;
     transition:background .2s, border-color .2s; min-width:64px;
     -webkit-tap-highlight-color:transparent; touch-action:manipulation;
   }
-  #pp-back-btn:hover,#pp-pause-btn:hover { background:rgba(0,229,255,.1); border-color:rgba(0,229,255,.6); }
+  #pp-back-btn:hover,#pp-setup-btn:hover,#pp-pause-btn:hover { background:rgba(0,229,255,.1); border-color:rgba(0,229,255,.6); }
   #pp-title-bar {
     font-family:'Orbitron',sans-serif; font-size:clamp(15px,4vw,21px); font-weight:900;
     background:linear-gradient(90deg,#00e5ff,#80f0ff,#00e5ff);
@@ -13991,3 +14046,282 @@ body.dz-game-landscape-required #dz-portrait-warn {
 }
 
 /* Give game panel headings right padding so title never hides behind hamburger */
+
+/* ══════════════════════════════════════════════════════════════
+   SUDOKU — Top-left nav bar inside play panel
+   Sits at top-left; hamburger stays at top-right — no overlap
+   ══════════════════════════════════════════════════════════════ */
+#sdk-topbar {
+  position: fixed !important;
+  top: 12px !important;
+  left: 14px !important;
+  z-index: 60 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Hide sdk-topbar when play panel is hidden */
+#sdk-play.hidden #sdk-topbar {
+  display: none !important;
+}
+
+/* ── Tetris & Reaction Setup buttons ── */
+#tetris-back-play,
+#rd-back-play {
+  position: fixed !important;
+  top: 72px !important;
+  left: 16px !important;
+  z-index: 60 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PHONE UI — Dropdown Menu & Legal Modals full mobile overhaul
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Dropdown: full-width bottom sheet on phones ── */
+@media (max-width: 540px) {
+  .dz-dropdown {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+    border-radius: 24px 24px 0 0 !important;
+    transform: translateY(100%) scale(1) !important;
+    transform-origin: bottom center !important;
+    transition: transform 0.32s cubic-bezier(0.23,1,0.32,1), opacity 0.28s ease, visibility 0.28s !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+  }
+  .dz-dropdown.open {
+    transform: translateY(0) scale(1) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+  /* drag handle indicator */
+  .dd-header::before {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+  }
+  .dd-header { position: relative; padding-top: 20px; }
+
+  /* bigger tap targets */
+  .dropdown-item.ddi-nav {
+    padding: 13px 18px !important;
+    font-size: 1rem !important;
+  }
+  .ddi-icon-wrap {
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .ddi-legal-pill {
+    padding: 13px 10px !important;
+    font-size: 0.78rem !important;
+    gap: 8px !important;
+  }
+  .ddi-legal-pill svg { width: 18px !important; height: 18px !important; }
+  .dd-group-label { font-size: 0.55rem !important; padding: 0 18px 8px !important; }
+  .dd-group { padding: 12px 0 4px !important; }
+  .dd-footer { padding: 14px 18px 20px !important; }
+  .dd-footer-copy { font-size: 0.72rem !important; }
+  .dd-footer-email { font-size: 0.68rem !important; }
+}
+
+/* ── Legal Modal Shells: full-screen on phones ── */
+@media (max-width: 600px) {
+  .lm-modal {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+  .lm-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 24px 24px 0 0 !important;
+    flex-direction: column !important;
+    transform: translateY(40px) scale(1) !important;
+  }
+  .lm-modal.active .lm-shell {
+    transform: translateY(0) scale(1) !important;
+  }
+
+  /* Sidebar becomes a horizontal scrolling tab bar */
+  .lm-sidebar {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 14px 14px 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    background: rgba(4,5,10,0.98) !important;
+    scrollbar-width: none;
+  }
+  .lm-sidebar::-webkit-scrollbar { display: none; }
+
+  /* Brand pill */
+  .lm-sidebar-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 8px 12px !important;
+    background: rgba(0,229,255,0.07) !important;
+    border: 1px solid rgba(0,229,255,0.2) !important;
+    border-radius: 20px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    margin-bottom: 8px !important;
+    font-size: 0.68rem !important;
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
+    align-self: center !important;
+  }
+  .lm-sb-dot { width: 7px !important; height: 7px !important; border-radius: 50% !important; }
+
+  /* Nav links as pills */
+  .lm-nav-links {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: center !important;
+  }
+  .lm-nav-link {
+    display: block !important;
+    white-space: nowrap !important;
+    padding: 7px 14px !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 20px !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    color: rgba(255,255,255,0.5) !important;
+    text-decoration: none !important;
+    transition: all 0.15s !important;
+    letter-spacing: 0.03em !important;
+    margin-bottom: 8px !important;
+  }
+  .lm-nav-link--active, .lm-nav-link:hover {
+    background: rgba(0,229,255,0.1) !important;
+    border-color: rgba(0,229,255,0.3) !important;
+    color: #00e5ff !important;
+  }
+  /* Hide "Also See" section in collapsed tab bar */
+  .lm-sidebar-other { display: none !important; }
+
+  /* Body full width */
+  .lm-body {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-left: none !important;
+  }
+  .lm-content {
+    padding: 18px 16px 32px !important;
+    max-height: calc(92vh - 110px) !important;
+  }
+  .lm-topbar {
+    padding: 16px 16px 12px !important;
+    gap: 10px !important;
+  }
+  .lm-topbar-icon {
+    width: 36px !important;
+    height: 36px !important;
+    flex-shrink: 0 !important;
+  }
+  .lm-page-title { font-size: 1rem !important; }
+  .lm-page-sub { font-size: 0.72rem !important; }
+  .lm-close {
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Contact cards single column */
+  .lm-contact-grid,
+  .lm-contact-grid--wide {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .lm-contact-card { padding: 14px 14px !important; gap: 12px !important; }
+  .lm-cc-icon { width: 36px !important; height: 36px !important; flex-shrink: 0 !important; }
+  .lm-cc-label { font-size: 0.68rem !important; }
+  .lm-cc-val { font-size: 0.82rem !important; word-break: break-all !important; }
+  .lm-cc-primary-badge { font-size: 0.55rem !important; padding: 3px 8px !important; }
+
+  /* Sections */
+  .lm-section { gap: 12px !important; padding: 14px 0 !important; }
+  .lm-section-icon { width: 36px !important; height: 36px !important; flex-shrink: 0 !important; }
+  .lm-section-title { font-size: 0.88rem !important; }
+  .lm-section-text { font-size: 0.82rem !important; line-height: 1.6 !important; }
+
+  /* Hero card */
+  .lm-hero-card { padding: 16px !important; }
+  .lm-hero-text { font-size: 0.82rem !important; line-height: 1.6 !important; }
+  .lm-hero-stat-row { gap: 10px !important; }
+  .lm-stat-num { font-size: 1.3rem !important; }
+
+  /* Highlight bar */
+  .lm-highlight-bar { padding: 12px 14px !important; font-size: 0.82rem !important; gap: 10px !important; }
+  .lm-highlight-bar svg { width: 18px !important; height: 18px !important; flex-shrink: 0 !important; }
+
+  /* Tag row wraps nicely */
+  .lm-tag-row { gap: 6px !important; flex-wrap: wrap !important; }
+  .lm-tag { font-size: 0.68rem !important; padding: 4px 10px !important; }
+
+  /* CTA button full width */
+  .lm-cta-btn { width: 100% !important; padding: 14px !important; font-size: 0.9rem !important; }
+
+  /* VGWA card */
+  .lm-vgwa-card { flex-direction: column !important; padding: 16px !important; gap: 12px !important; }
+
+  /* Footer logos */
+  .lm-logos-row { padding: 14px 0 4px !important; gap: 12px !important; }
+  .lm-footer-logo { height: 26px !important; }
+
+  /* Response time */
+  #contact-time .lm-section-icon { width: 32px !important; height: 32px !important; }
+}
+
+/* ── Dropdown footer email link ── */
+.dd-footer-email {
+  display: block;
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  color: rgba(0,229,255,0.5);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  transition: color 0.2s;
+}
+.dd-footer-email:hover { color: rgba(0,229,255,0.85); }
+
+/* ── Hub footer: wrap email nicely on mobile ── */
+@media (max-width: 480px) {
+  .footer-links {
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  .footer-divider { display: none !important; }
+  .footer-link { font-size: 0.75rem !important; padding: 6px 14px !important; }
+}
