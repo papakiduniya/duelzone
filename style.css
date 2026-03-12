@@ -1633,16 +1633,7 @@ html, body {
   #screen-tapbattle { padding-bottom: 0; }
   #tap-arena { min-height: 340px; }
   .tap-count { font-size: 3.5rem; }
-  .rps-btn {
-    padding: 10px 4px;
-    min-width: 0;
-    font-size: 0.72rem;
-    letter-spacing: 0.03em;
-  }
-  .rps-btn > span:first-child,
-  .rps-btn .rps-btn-emoji { font-size: 1.5rem; }
-  .rps-btn span { font-size: 0.6rem; letter-spacing: 0.04em; }
-  .rps-btn-row { gap: 6px; }
+  .rps-btn { padding: 14px 6px; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -7512,6 +7503,7 @@ html, body {
   border-radius: 1px;
 }
 
+/* P1 territory fill — expands from left */
 #ptr-fill-left {
   position: absolute;
   left: 0;
@@ -7524,6 +7516,7 @@ html, body {
   box-shadow: 4px 0 16px rgba(0,200,255,0.35);
 }
 
+/* P2 territory fill — expands from right */
 #ptr-fill-right {
   position: absolute;
   right: 0;
@@ -8225,6 +8218,50 @@ body.light-mode {
 .tw-pending { color: rgba(255,255,255,0.6); }
 .tw-future  { color: rgba(255,255,255,0.3); }
 
+/* ── Minesweeper ─────────────────────────────────────────────── */
+.mine-grid {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+}
+.mine-cell {
+  aspect-ratio: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: 'Rajdhani', monospace;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+  min-width: 0;
+  padding: 0;
+}
+.mine-cell:hover { background: rgba(255,255,255,0.16); }
+.mine-revealed    { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.06); cursor: default; }
+.mine-revealed:hover { background: rgba(0,0,0,0.5); }
+.mine-hit         { background: rgba(239,68,68,0.4) !important; }
+.mine-flagged     { background: rgba(251,191,36,0.12); }
+.mine-n1 { color: #60a5fa; } .mine-n2 { color: #4ade80; } .mine-n3 { color: #f87171; }
+.mine-n4 { color: #818cf8; } .mine-n5 { color: #ef4444; } .mine-n6 { color: #22d3ee; }
+.mine-n7 { color: #f472b6; } .mine-n8 { color: #e2e8f0; }
+.mine-flag-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: 'Rajdhani', sans-serif;
+  transition: background 0.1s;
+}
+.mine-flag-active { background: rgba(251,191,36,0.2); border-color: #fbbf24; color: #fbbf24; }
+
 /* ── Blackjack ───────────────────────────────────────────────── */
 .bj-card {
   width: 52px; height: 72px;
@@ -8599,10 +8636,33 @@ body.light-mode {
 
 /* ═══════════════════════════════════════════════════
    NEW GAME STYLES: Tetris, Bomberman, DrawGuess,
-   Pixel Racer, Reaction Duel
+   Pixel Racer, Reaction Duel, Territory Wars
    ═══════════════════════════════════════════════════ */
 
-
+/* Territory Wars cells */
+.tw-cell {
+  width: 38px; height: 38px;
+  border-radius: 4px;
+  background: #1a1c2e;
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: default;
+  transition: background 0.15s, transform 0.1s;
+}
+.tw-cell-p1 { background: rgba(0,229,255,0.4); border-color: rgba(0,229,255,0.5); }
+.tw-cell-p2 { background: rgba(245,0,87,0.4); border-color: rgba(245,0,87,0.5); }
+.tw-cell-capturable {
+  background: rgba(255,214,0,0.12);
+  border-color: rgba(255,214,0,0.4);
+  cursor: pointer;
+  animation: twPulse 1.5s ease-in-out infinite;
+}
+.tw-cell-capturable:hover {
+  background: rgba(255,214,0,0.28);
+  transform: scale(1.08);
+}
+@keyframes twPulse {
+  0%,100% { border-color: rgba(255,214,0,0.3); }
+  50%      { border-color: rgba(255,214,0,0.7); }
 }
 
 /* Draw & Guess color button active state */
@@ -8729,7 +8789,11 @@ body.light-mode {
   letter-spacing: 0.05em;
 }
 
-
+/* Make mine grid cells touch-friendly */
+.mine-cell {
+  min-width: 28px !important;
+  min-height: 28px !important;
+}
 
 /* Pixel racer canvas responsive */
 #pr-canvas {
@@ -8746,7 +8810,7 @@ body.light-mode {
 }
 
 /* Checkers board responsive */
-#checkers-canvas {
+#checkers-canvas, #territory-canvas {
   max-width: 100% !important;
   height: auto !important;
   touch-action: none;
@@ -8761,6 +8825,11 @@ body.light-mode {
   .bj-card {
     min-width: 38px !important;
     font-size: 0.85rem !important;
+  }
+  .mine-cell {
+    min-width: 24px !important;
+    min-height: 24px !important;
+    font-size: 0.7rem !important;
   }
   #pr-canvas {
     width: 100% !important;
@@ -9046,6 +9115,29 @@ select {
 }
 
 
+/* ── 7. Minesweeper ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #screen-minesweeper {
+    padding: calc(var(--safe-top) + 10px) 8px calc(var(--safe-bottom) + 16px);
+  }
+
+  .mine-cell {
+    min-width: 30px !important;
+    min-height: 30px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Difficulty preset buttons */
+  #ms-difficulty-btns {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #ms-difficulty-btns button {
+    flex: 1 1 calc(50% - 6px);
+    min-height: 44px;
+  }
+}
 
 
 /* ── 8. Blackjack ────────────────────────────────────────────────────────── */
@@ -9126,6 +9218,7 @@ select {
   #pong-canvas,
   #bm-canvas,
   #pr-canvas,
+  #territory-canvas,
   #space-canvas,
   #star-canvas,
   #tanks-canvas,
@@ -9329,7 +9422,12 @@ select {
 }
 
 
+/* ── 24. Territory ────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
+  #territory-canvas {
+    width: 96vw !important;
+    height: 96vw !important;
+  }
 }
 
 
@@ -9402,6 +9500,10 @@ select {
   #screen-chess,
   #screen-battleship,
   #screen-checkers,
+  #screen-minesweeper {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 
@@ -12053,6 +12155,11 @@ canvas {
   /* Force every landscape-game screen to fill the viewport with no scroll */
   #screen-tanks, #screen-spacedodge, #screen-starcatcher,
   #screen-bomberman, #screen-tetris, #screen-pingpong,
+  #screen-territory {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
 
   /* ── Play panels: column layout fills full height ── */
   #tanks-play-panel,
@@ -12060,10 +12167,47 @@ canvas {
   #sc-play-panel,
   #bm-play,
   #pp-wrap,
+  #tw-play {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    background: #07080f;
+  }
 
+  /* Territory: grid scroll area fills remaining space */
+  #tw-play > div[style*="flex:1"],
+  #tw-play > div[style*="overflow:auto"] {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+  }
 
+  /* Territory grid cells: compact in landscape */
+  #tw-play .tw-cell {
+    min-width: 24px !important;
+    min-height: 24px !important;
+  }
 
+  /* Territory topbar + score bar: compact */
+  #tw-play .dz-topbar {
+    padding: 3px 10px !important;
+    min-height: 32px !important;
+  }
 
+  /* Territory mobile controls: fixed to bottom, no overflow */
+  #tw-mobile-controls {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-height: 110px !important;
+    overflow: hidden !important;
+  }
 
   /* Tetris play area: row layout with both boards side by side */
   #tetris-play {
@@ -12287,7 +12431,16 @@ canvas {
   #tanks-p2-hud [style*="width:100px"] { width: 60px !important; }
 }
 
+/* Minesweeper tabs */
+.mine-tab-hidden { display: none !important; }
+.mine-tab-btn.active {
+  background: rgba(0,229,255,0.2) !important;
+  border-color: rgba(0,229,255,0.6) !important;
+  color: #00e5ff !important;
+}
 @media (min-width: 700px) {
+  .mine-tabs { display: none !important; }
+  .mine-tab-hidden { display: block !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -12377,6 +12530,13 @@ canvas {
   }
 }
 
+/* Territory war: remove gap between topbar and game content */
+#tw-play .dz-topbar {
+  position: relative;
+  top: auto;
+  margin-bottom: 0;
+  padding: 6px 12px;
+}
 
 /* Bomberman: mobile layout fix — controls below canvas */
 #bm-play {
@@ -12670,6 +12830,7 @@ canvas {
   #sd-canvas,
   #ping-canvas,
   #checkers-canvas,
+  #territory-canvas,
   #pr-canvas,
   #ah-canvas,
   #airhockey-canvas,
@@ -12721,6 +12882,13 @@ canvas {
     padding: 4px 0;
   }
 
+  .mine-cell {
+    min-width: clamp(24px, 7vw, 34px);
+    min-height: clamp(24px, 7vw, 34px);
+    font-size: clamp(0.6rem, 2vw, 0.85rem);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   #rd-tap-p1,
   #rd-tap-p2 {
@@ -12808,6 +12976,13 @@ canvas {
   .mfd-board        { max-width: min(95vw, 480px); margin: 0 auto; }
   #cdd-board        { max-width: min(95vw, 480px); margin: 0 auto; overflow: hidden; }
 
+  #mine-grid-p1,
+  #mine-grid-p2 {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    display: grid;
+  }
 
   #sd-joystick-wrap {
     display: flex;
@@ -12815,6 +12990,8 @@ canvas {
     align-items: center;
     width: 100%;
   }
+
+  #territory-canvas,
   #checkers-canvas {
     display: block;
     margin: 0 auto;
@@ -12886,6 +13063,11 @@ canvas {
     min-width: 36px;
   }
 
+  .mine-cell {
+    min-width: 26px;
+    min-height: 26px;
+    font-size: 0.65rem;
+  }
 
   #rd-tap-p1,
   #rd-tap-p2 {
@@ -12893,6 +13075,11 @@ canvas {
     font-size: 1.4rem;
   }
 
+  #mine-flag-p1,
+  #mine-flag-p2 {
+    min-height: 42px;
+    font-size: 0.85rem;
+  }
 
   .darts-num-btn {
     min-width: 44px;
@@ -13012,6 +13199,48 @@ canvas {
 }
 
 /* ── Feature 8: Mine tab bar — mobile only ───────────────────── */
+@media (max-width: 768px) {
+  #mine-tab-bar {
+    display: flex;
+    gap: 0;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 12px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+    flex-shrink: 0;
+  }
+
+  .mine-tab {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: none;
+    color: rgba(255,255,255,0.45);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 11px 8px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.04em;
+  }
+
+  .mine-tab.active {
+    background: rgba(0,229,255,0.14);
+    color: #00e5ff;
+  }
+
+  .mine-tab:first-child { border-right: 1px solid rgba(255,255,255,0.1); }
+
+  /* On mobile: stack grids and let tabs control visibility */
+  #mine-play > div[style*="display:flex"] {
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+}
 
 
 /* ── Feature 6: Onboarding — mobile tweaks ───────────────────── */
@@ -13216,6 +13445,18 @@ canvas {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* ── 17. Territory: overflow scroll on tiny screens ──────────────── */
+@media (max-width: 480px) {
+  #tw-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: calc(100vw - 16px);
+  }
+  .tw-cell {
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+}
 
 /* ── 18. Checkers: board responsive ──────────────────────────────── */
 @media (max-width: 480px) {
@@ -13882,9 +14123,46 @@ body.dz-game-landscape-required #dz-portrait-warn {
 }
 /* Override: if user dismissed, JS removes the class — CSS alone handles it */
 
+/* Territory: full-height play area in all modes */
+#screen-territory {
+  display: flex;
+  flex-direction: column;
+}
+#tw-play {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
 
+/* Territory: the scrollable grid area */
+#tw-play > div[style*="flex:1"] {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
+/* Territory mobile controls bar */
+#tw-mobile-controls {
+  flex-shrink: 0;
+  width: 100%;
+}
 
+/* Portrait mode: normal scrollable layout for Territory */
+@media screen and (orientation: portrait) {
+  #screen-territory {
+    min-height: 100dvh;
+    height: auto;
+    overflow: auto;
+  }
+  #tw-play {
+    min-height: 100dvh;
+    max-height: none;
+  }
+  #tw-mobile-controls {
+    max-height: none;
+  }
+}
 
 /* ── GLOBAL BACK BUTTON SIZE FIX ──────────────────────────────────────────
    Ensure back buttons NEVER stretch full-width regardless of container type.
@@ -13906,14 +14184,102 @@ body.dz-game-landscape-required #dz-portrait-warn {
    FIX 6: Prevent scroll bounce / overscroll on fixed game panels
    Applies to all position:fixed play panels set by DuelZone fixes
    ══════════════════════════════════════════════════════════════ */
+#mine-play,
+#tetris-play,
+#bm-play,
+#rd-play,
+#tw-play,
+#sdk-play,
+#carrom-play {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
 
 /* Also lock body overscroll when any game is active */
+body:has(#mine-play:not(.hidden)),
+body:has(#tetris-play:not(.hidden)),
+body:has(#bm-play:not(.hidden)),
+body:has(#rd-play:not(.hidden)),
+body:has(#tw-play:not(.hidden)),
+body:has(#sdk-play:not(.hidden)),
+body:has(#carrom-play:not(.hidden)) {
+  overscroll-behavior: none;
+  overflow: hidden;
+}
 
 
 /* ══════════════════════════════════════════════════════════════
    FIX 7: Landscape mode — compact layouts for portrait-first games
    These games work in both orientations but need landscape tweaks
    ══════════════════════════════════════════════════════════════ */
+@media screen and (orientation: landscape) and (max-height: 520px) {
+
+  /* Minesweeper: reduce heading + tab padding in landscape */
+  #mine-play > div:first-child {
+    padding: 4px 0 2px !important;
+  }
+  #mine-play h1 {
+    font-size: 0.85rem !important;
+  }
+  #mine-play .mine-tabs {
+    margin-bottom: 4px !important;
+  }
+
+  /* Tetris: reduce heading in landscape */
+  #tetris-play > div:first-child {
+    padding: 4px 0 2px !important;
+  }
+  #tetris-play h1 {
+    font-size: 0.85rem !important;
+  }
+
+  /* Reaction Duel: shrink signal circle + heading */
+  #rd-play h1 {
+    font-size: 0.85rem !important;
+  }
+  #rd-play > div:first-child {
+    padding: 4px 0 2px !important;
+  }
+  #rd-signal-bg {
+    width: 140px !important;
+    height: 140px !important;
+    margin-bottom: 8px !important;
+  }
+  #rd-signal-emoji {
+    font-size: 2.2rem !important;
+  }
+  #rd-signal-text {
+    font-size: 0.9rem !important;
+  }
+  #rd-status {
+    margin-bottom: 8px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Sudoku: shrink heading */
+  #sdk-play h1 {
+    font-size: 0.85rem !important;
+  }
+  #sdk-play > div:first-child {
+    padding: 4px 0 2px !important;
+  }
+
+  /* Territory: shrink heading */
+  #tw-play h1 {
+    font-size: 0.85rem !important;
+  }
+  #tw-play > div:first-child {
+    padding: 4px 0 1px !important;
+  }
+
+  /* Bomberman: shrink heading */
+  #bm-play h1 {
+    font-size: 0.85rem !important;
+  }
+  #bm-play > div:first-child {
+    padding: 4px 0 2px !important;
+  }
+}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -13960,7 +14326,20 @@ body.dz-game-landscape-required #dz-portrait-warn {
    Territory Wars: direct-tap mobile improvements
    ══════════════════════════════════════════════════════════════ */
 /* Touch active feedback on capturable cells */
+.tw-cell-capturable:active {
+  background: rgba(255,214,0,0.45) !important;
+  transform: scale(0.95);
+}
 /* Bigger tap target area on mobile */
+@media (pointer: coarse) {
+  .tw-cell {
+    border-radius: 3px;
+  }
+  .tw-cell-capturable {
+    border-color: rgba(255,214,0,0.6);
+    background: rgba(255,214,0,0.16);
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════
    HAMBURGER MENU — Always visible, top-right, above ALL panels
@@ -13991,3 +14370,13 @@ body.dz-game-landscape-required #dz-portrait-warn {
 }
 
 /* Give game panel headings right padding so title never hides behind hamburger */
+#mine-play > div:first-child,
+#tetris-play > div:first-child,
+#bm-play > div:first-child,
+#rd-play > div:first-child,
+#tw-play > div:first-child,
+#sdk-play > div:first-child,
+#carrom-play > div:first-child,
+#ludo-play > div:first-child {
+  padding-right: 64px !important;
+}
