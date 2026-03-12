@@ -105,12 +105,12 @@
   }
 
   // ── Hide internal duplicate buttons ───────────────────────────
-  // These classes/elements duplicate what our universal topbar already does
-  // We hide them to prevent overlap and visual clutter
+  // Only hide the "← Hub" buttons — the universal topbar replaces those.
+  // We do NOT hide .dz-topbar because it contains the ⚙ Setup button
+  // which users still need to access mid-game.
   var INTERNAL_BTN_SELECTORS = [
     '.ghp-back-hub',      // "← Hub" buttons inside game home panels
     '.ghp-back-v2',       // v2 style hub buttons
-    '.dz-topbar',         // internal topbars that have their own FS + back buttons
   ];
 
   function hideInternalButtons(screenEl) {
@@ -408,6 +408,7 @@
   }, { passive: false });
 
   // ── Swipe right from left edge → hub ─────────────────────────
+  // 44px zone matches minimum touch target guidelines
   var _sx = 0, _sy = 0;
   document.addEventListener('touchstart', function(e) {
     _sx = e.touches[0].clientX;
@@ -417,7 +418,7 @@
     if (!_activeScreen) return;
     var dx = e.changedTouches[0].clientX - _sx;
     var dy = Math.abs(e.changedTouches[0].clientY - _sy);
-    if (_sx < 30 && dx > 70 && dy < 60) window.showHub();
+    if (_sx < 44 && dx > 80 && dy < 60) window.showHub();
   }, { passive: true });
 
   // ── Observe new canvases / dpad ───────────────────────────────
