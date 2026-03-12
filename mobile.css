@@ -1,13 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════
    DuelZone · Mobile Optimization System  (mobile.css)
-   
-   ISOLATION RULES:
-   - Sections 1 & 2: New elements & fullscreen — safe globally
-   - Sections 3–8: All existing-element overrides are inside @media
-   - Desktop (769px+) is NEVER touched by any rule here
+
+   ISOLATION GUARANTEE:
+   ─ Sections 1 & 2  : Brand-new mobile-only wrapper elements.
+                        Never conflict with existing desktop rules.
+   ─ Section 3+      : Every existing-element override is strictly
+                        inside the correct @media block.
+   ─ Desktop (769px+): NEVER touched by any rule in this file.
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── 1. UNIVERSAL WRAPPER — brand new elements, no conflicts ───── */
+
+/* ══════════════════════════════════════════════════════════════
+   § 1  UNIVERSAL GAME WRAPPER
+        Brand-new elements — zero collision risk
+   ══════════════════════════════════════════════════════════════ */
 
 #dz-universal-wrapper {
   display: none;
@@ -27,35 +33,69 @@
   display: flex;
 }
 
+/* ── Top bar ─────────────────────────────────────────────────── */
+
 #dz-universal-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
   width: 100%;
   padding: 8px 12px;
-  background: rgba(7, 8, 15, 0.92);
+  background: rgba(7, 8, 15, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 200 !important;
   flex-shrink: 0;
-  min-height: 44px;
+  min-height: 48px;
   box-sizing: border-box;
 }
 
+/* Back button — always left */
+#dz-univ-back {
+  order: 1 !important;
+  flex-shrink: 0 !important;
+  z-index: 201 !important;
+}
+
+/* Game title — center, compressed */
+#dz-univ-game-title {
+  order: 2 !important;
+  flex: 1 !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  padding: 0 8px !important;
+  font-size: 0.78rem !important;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Fullscreen button — hidden in the topbar (hamburger handles nav) */
+#dz-univ-fs {
+  display: none !important;
+}
+
 .dz-univ-back-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.75);
-  border-radius: 8px;
-  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 9px;
+  padding: 7px 16px;
   font-size: 0.82rem;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  letter-spacing: 0.03em;
   min-width: 64px;
-  min-height: 36px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,18 +103,20 @@
   -webkit-tap-highlight-color: transparent;
   transition: background 0.15s, transform 0.1s;
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dz-univ-back-btn:active {
-  background: rgba(255,255,255,0.18);
-  transform: scale(0.97);
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.96);
 }
 
 .dz-univ-title {
   font-family: 'Orbitron', sans-serif;
   font-size: 0.7rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-align: center;
@@ -86,15 +128,15 @@
 }
 
 .dz-univ-fs-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.75);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 9px;
   padding: 7px 12px;
   font-size: 1rem;
   cursor: pointer;
   min-width: 44px;
-  min-height: 36px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,15 +149,17 @@
 }
 
 .dz-univ-fs-btn:active {
-  background: rgba(255,255,255,0.2);
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(0.94);
 }
 
 .dz-univ-fs-btn.fs-active {
   color: #00e5ff;
-  border-color: rgba(0,229,255,0.4);
-  background: rgba(0,229,255,0.1);
+  border-color: rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.1);
 }
+
+/* ── Game area ───────────────────────────────────────────────── */
 
 #dz-game-area {
   flex: 1;
@@ -131,7 +175,6 @@
   min-height: 0;
 }
 
-/* Game screen moved inside wrapper fills the area completely */
 #dz-game-area > [id^="screen-"] {
   width: 100%;
   min-height: 0;
@@ -140,6 +183,8 @@
   flex-direction: column;
   align-items: center;
 }
+
+/* ── Universal controls strip ────────────────────────────────── */
 
 #dz-universal-controls {
   width: 100%;
@@ -158,7 +203,11 @@
   padding: 0;
 }
 
-/* ── 2. FULLSCREEN — works on all devices, no interference ────── */
+
+/* ══════════════════════════════════════════════════════════════
+   § 2  FULLSCREEN API SUPPORT
+        Works on all devices — no interference with layout
+   ══════════════════════════════════════════════════════════════ */
 
 #dz-universal-wrapper:fullscreen,
 #dz-universal-wrapper:-webkit-full-screen,
@@ -174,7 +223,7 @@
 :fullscreen #dz-universal-topbar,
 :-webkit-full-screen #dz-universal-topbar,
 :-moz-full-screen #dz-universal-topbar {
-  background: rgba(0,0,0,0.85);
+  background: rgba(0, 0, 0, 0.88);
 }
 
 :fullscreen canvas,
@@ -194,18 +243,26 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(7,8,15,0.9);
+  background: rgba(7, 8, 15, 0.92);
   padding: 8px 12px 16px;
   z-index: 200;
 }
 
-/* ════════════════════════════════════════════════════════════════
-   SECTIONS 3–8: ALL INSIDE @media — desktop is never touched
-   ════════════════════════════════════════════════════════════════ */
+/* ── Rotate prompt polish ─────────────────────────────────────── */
+#dz-rotate-prompt {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
 
-/* ── 3. TABLET & MOBILE (≤ 768px) ────────────────────────────── */
+
+/* ══════════════════════════════════════════════════════════════
+   § 3  CORE MOBILE  (≤ 768px)
+        ALL overrides of existing elements are inside this block
+   ══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+
+  /* ── Base ────────────────────────────────────────────────────── */
 
   html, body {
     overflow-x: hidden;
@@ -217,6 +274,24 @@
     overscroll-behavior-y: contain;
   }
 
+  /* Prevent text selection globally in game panels */
+  [id$="-play"] *,
+  [id$="-play-panel"] * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* But allow text inputs to be selectable */
+  input[type="text"],
+  input[type="number"],
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+
+  /* ── Hub screen ──────────────────────────────────────────────── */
+
   #screen-hub {
     padding: 36px 16px 32px;
     gap: 24px;
@@ -224,10 +299,35 @@
     width: 100%;
   }
 
+  /* ── Arena grid ──────────────────────────────────────────────── */
+
   #arena-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 14px;
   }
+
+  /* ── Hamburger — fixed top-right, always above everything ──────── */
+
+  #dz-hamburger,
+  .hamburger-btn {
+    position: fixed !important;
+    top: 14px !important;
+    right: 14px !important;
+    left: auto !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Dropdown opens from top-right */
+  #dz-dropdown {
+    z-index: 9998 !important;
+  }
+
+
+  /* ── Canvas ───────────────────────────────────────────────────── */
 
   canvas {
     max-width: 100%;
@@ -236,18 +336,21 @@
     user-select: none;
   }
 
+  /* Full-width canvas games */
   #tanks-canvas,
   #bm-canvas,
   #sc-canvas,
   #sd-canvas,
   #ping-canvas,
+  #pp-canvas,
   #checkers-canvas,
   #territory-canvas,
   #pr-canvas,
   #ah-canvas,
   #airhockey-canvas,
   #dg-canvas,
-  #draw-canvas {
+  #draw-canvas,
+  #carrom-canvas {
     max-width: 100%;
     width: 100%;
     height: auto;
@@ -256,19 +359,26 @@
     touch-action: none;
   }
 
+
+  /* ── D-pad controls ───────────────────────────────────────────── */
+
   .dz-dpad-btn {
-    width: clamp(48px, 13vw, 60px);
-    height: clamp(48px, 13vw, 60px);
-    font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+    width: clamp(48px, 13vw, 62px);
+    height: clamp(48px, 13vw, 62px);
+    font-size: clamp(1.1rem, 3.5vw, 1.5rem);
     border-radius: 10px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .dz-action-btn {
-    min-width: clamp(56px, 15vw, 76px);
-    height: clamp(48px, 13vw, 60px);
+    min-width: clamp(56px, 15vw, 80px);
+    height: clamp(48px, 13vw, 62px);
     font-size: clamp(0.75rem, 2.2vw, 0.95rem);
     border-radius: 10px;
     padding: 0 10px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .dz-mobile-ctrl-wrap {
@@ -277,13 +387,37 @@
     justify-content: center;
   }
 
+
+  /* ── Game mobile control bars ─────────────────────────────────── */
+
   #tanks-mobile-controls {
     width: 100%;
     max-width: 820px;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    padding: 6px 0;
+    padding: 8px 4px;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+  /* Tanks HUD: allow wrap on very narrow screens */
+  #tanks-p1-hud,
+  #tanks-p2-hud {
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  #tanks-p1-hud [style*="width:100px"],
+  #tanks-p2-hud [style*="width:100px"],
+  #tanks-hud [style*="width:100px"] {
+    width: 70px !important;
+  }
+
+  #tanks-hud {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px 8px;
   }
 
   #bm-mobile-controls {
@@ -294,38 +428,13 @@
     padding: 4px 0;
   }
 
-  .mine-cell {
-    min-width: clamp(24px, 7vw, 34px);
-    min-height: clamp(24px, 7vw, 34px);
-    font-size: clamp(0.6rem, 2vw, 0.85rem);
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
 
-  #rd-tap-p1,
-  #rd-tap-p2 {
-    min-height: 80px;
-    font-size: 1.3rem;
-    border-radius: 16px;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .bj-card {
-    min-width: clamp(34px, 9vw, 50px);
-    font-size: clamp(0.72rem, 2.5vw, 0.95rem);
-  }
-
-  #chess-board-container,
-  .chess-board-wrap {
-    max-width: min(90vw, 480px);
-    margin: 0 auto;
-  }
+  /* ── Fullscreen button ────────────────────────────────────────── */
 
   .dz-fs-btn {
-    min-height: 38px;
+    min-height: 40px;
     min-width: 44px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 0.8rem;
     display: flex;
     align-items: center;
@@ -340,6 +449,9 @@
     box-sizing: border-box;
   }
 
+
+  /* ── Game home panels (GHP) ───────────────────────────────────── */
+
   .game-home-panel,
   .ghp-v2 {
     padding: 20px 16px 24px;
@@ -347,14 +459,17 @@
     box-sizing: border-box;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-height: calc(100vh - 60px);
+    max-height: calc(100dvh - 60px);
   }
 
   .ghp-start-btn {
-    min-height: 48px;
+    min-height: 52px;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+
+  /* ── Global touch targets ─────────────────────────────────────── */
 
   button,
   [role="button"] {
@@ -363,30 +478,16 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  [id$="-play"] *,
-  [id$="-play-panel"] * {
-    -webkit-user-select: none;
-    user-select: none;
-  }
 
-  input[type="text"],
-  input[type="number"],
-  textarea {
-    -webkit-user-select: text;
-    user-select: text;
-  }
+  /* ── Minesweeper ──────────────────────────────────────────────── */
 
-  #tanks-hud {
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 4px 8px;
+  .mine-cell {
+    min-width: clamp(24px, 7vw, 36px);
+    min-height: clamp(24px, 7vw, 36px);
+    font-size: clamp(0.6rem, 2vw, 0.85rem);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
-
-  .d2048-board      { max-width: min(90vw, 420px); margin: 0 auto; }
-  #bs-placement-grid,
-  #bs-attack-grid   { max-width: min(90vw, 360px); margin: 0 auto; }
-  .mfd-board        { max-width: min(95vw, 480px); margin: 0 auto; }
-  #cdd-board        { max-width: min(95vw, 480px); margin: 0 auto; overflow: hidden; }
 
   #mine-grid-p1,
   #mine-grid-p2 {
@@ -396,6 +497,58 @@
     display: grid;
   }
 
+  #mine-flag-p1,
+  #mine-flag-p2 {
+    min-height: 44px;
+    font-size: 0.85rem;
+  }
+
+
+  /* ── Reaction/Tap zones ───────────────────────────────────────── */
+
+  #rd-tap-p1,
+  #rd-tap-p2 {
+    min-height: 80px;
+    font-size: 1.3rem;
+    border-radius: 16px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+
+  /* ── Blackjack cards ──────────────────────────────────────────── */
+
+  .bj-card {
+    min-width: clamp(34px, 9vw, 52px);
+    font-size: clamp(0.72rem, 2.5vw, 0.95rem);
+  }
+
+
+  /* ── Chess ────────────────────────────────────────────────────── */
+
+  #chess-board-container,
+  .chess-board-wrap {
+    max-width: min(90vw, 480px);
+    margin: 0 auto;
+  }
+
+  .chess-square {
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+
+  /* ── Board games ──────────────────────────────────────────────── */
+
+  .d2048-board      { max-width: min(90vw, 420px);  margin: 0 auto; }
+  #bs-placement-grid,
+  #bs-attack-grid   { max-width: min(90vw, 360px);  margin: 0 auto; }
+  .mfd-board        { max-width: min(95vw, 480px);  margin: 0 auto; }
+  #cdd-board        { max-width: min(95vw, 480px);  margin: 0 auto; overflow: hidden; }
+
+
+  /* ── SpaceDodge joystick ──────────────────────────────────────── */
+
   #sd-joystick-wrap {
     display: flex;
     justify-content: center;
@@ -403,16 +556,119 @@
     width: 100%;
   }
 
+
+  /* ── Territory & Checkers canvas ──────────────────────────────── */
+
   #territory-canvas,
   #checkers-canvas {
     display: block;
     margin: 0 auto;
   }
-}
 
-/* ── 4. SMALL PHONE (≤ 480px) ─────────────────────────────────── */
+
+  /* ── PingPong ─────────────────────────────────────────────────── */
+
+  #pp-canvas-wrap {
+    width: 100%;
+    padding: 0;
+  }
+
+  #pp-canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  #pp-wrap {
+    padding: 0 4px !important;
+  }
+
+
+  /* ── StarCatcher ──────────────────────────────────────────────── */
+
+  #sc-play-panel {
+    padding: 4px 0 !important;
+  }
+
+  #sc-canvas {
+    display: block;
+    margin: 0 auto;
+  }
+
+
+  /* ── Carrom ───────────────────────────────────────────────────── */
+
+  #carrom-canvas-wrap {
+    padding: 2px 6px 6px;
+  }
+
+
+  /* ── Darts ────────────────────────────────────────────────────── */
+
+  .darts-num-btn {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 0.9rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+
+  /* ── Minesweeper tab bar ──────────────────────────────────────── */
+
+  #mine-tab-bar {
+    display: flex;
+    gap: 0;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 12px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .mine-tab {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: rgba(255, 255, 255, 0.45);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.04em;
+  }
+
+  .mine-tab.active {
+    background: rgba(0, 229, 255, 0.14);
+    color: #00e5ff;
+  }
+
+  .mine-tab:first-child {
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Stack mine grids vertically; tabs control visibility */
+  #mine-play > div[style*="display:flex"] {
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+}
+/* end @media 768px */
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 4  SMALL PHONE  (≤ 480px)
+   ══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 480px) {
+
+  /* ── Hub ──────────────────────────────────────────────────────── */
 
   #screen-hub {
     padding: 24px 12px 24px;
@@ -437,6 +693,9 @@
     font-size: 0.66rem;
   }
 
+
+  /* ── Game home panels ─────────────────────────────────────────── */
+
   .ghp-title {
     font-size: 1.4rem;
   }
@@ -451,11 +710,15 @@
   .ghp-mode-btn {
     padding: 10px 16px;
     font-size: 0.82rem;
-    min-height: 42px;
+    min-height: 44px;
   }
 
+
+  /* ── Topbar ───────────────────────────────────────────────────── */
+
   #dz-universal-topbar {
-    padding: 5px 8px;
+    padding: 5px 8px !important;
+    min-height: 44px;
   }
 
   .dz-univ-title {
@@ -467,24 +730,23 @@
     padding: 5px 10px;
     font-size: 0.75rem;
     min-width: 52px;
+    min-height: 34px;
   }
 
   .dz-univ-fs-btn {
     padding: 5px 8px;
     font-size: 0.88rem;
     min-width: 36px;
+    min-height: 34px;
   }
+
+
+  /* ── Minesweeper ──────────────────────────────────────────────── */
 
   .mine-cell {
     min-width: 26px;
     min-height: 26px;
     font-size: 0.65rem;
-  }
-
-  #rd-tap-p1,
-  #rd-tap-p2 {
-    min-height: 90px;
-    font-size: 1.4rem;
   }
 
   #mine-flag-p1,
@@ -493,14 +755,106 @@
     font-size: 0.85rem;
   }
 
+
+  /* ── Reaction tap ─────────────────────────────────────────────── */
+
+  #rd-tap-p1,
+  #rd-tap-p2 {
+    min-height: 90px;
+    font-size: 1.4rem;
+  }
+
+
+  /* ── Darts ────────────────────────────────────────────────────── */
+
   .darts-num-btn {
     min-width: 44px;
     min-height: 44px;
     font-size: 0.9rem;
   }
-}
 
-/* ── 5. VERY SMALL (≤ 360px) ──────────────────────────────────── */
+
+  /* ── Carrom scores ────────────────────────────────────────────── */
+
+  #carrom-score-p,
+  #carrom-score-ai {
+    font-size: 1.3rem !important;
+  }
+
+  #carrom-timer {
+    font-size: 0.95rem !important;
+  }
+
+
+  /* ── SpaceDodge HUD ───────────────────────────────────────────── */
+
+  #sd-hud {
+    gap: 4px;
+    padding: 4px 6px !important;
+  }
+
+  #sd-p1-hp-bar,
+  #sd-p2-hp-bar {
+    width: 60px !important;
+  }
+
+  #sd-timer {
+    font-size: 16px !important;
+  }
+
+
+  /* ── Territory overflow ───────────────────────────────────────── */
+
+  #tw-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: calc(100vw - 16px);
+  }
+
+  .tw-cell {
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+
+  /* ── Checkers ─────────────────────────────────────────────────── */
+
+  #ck-board-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: calc(100vw - 16px);
+  }
+
+  #ck-game-area {
+    flex-direction: column !important;
+    align-items: center;
+  }
+
+  #ck-score-left,
+  #ck-score-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+
+  /* ── Onboarding box ───────────────────────────────────────────── */
+
+  #dz-ob-box {
+    padding: 28px 20px 24px;
+  }
+
+  #dz-ob-title    { font-size: 1.15rem; }
+  #dz-ob-tips li  { font-size: 0.85rem; padding: 8px 12px; }
+  #dz-ob-close    { font-size: 0.82rem; padding: 12px 20px; }
+
+}
+/* end @media 480px */
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 5  VERY SMALL PHONE  (≤ 360px)
+   ══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 360px) {
 
@@ -520,22 +874,35 @@
     min-width: 52px;
     font-size: 0.72rem;
   }
-}
 
-/* ── 6. LANDSCAPE PHONE (short viewport) ─────────────────────── */
+  .dz-univ-back-btn {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    min-width: 46px;
+  }
+
+}
+/* end @media 360px */
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 6  LANDSCAPE PHONE  (short viewport, wide orientation)
+        Targets: max-height 500px + landscape orientation
+   ══════════════════════════════════════════════════════════════ */
 
 @media screen and (orientation: landscape) and (max-height: 500px) {
 
+  /* Topbar goes ultra compact */
   #dz-universal-topbar {
-    padding: 4px 10px;
-    min-height: 36px;
+    padding: 4px 10px !important;
+    min-height: 36px !important;
   }
 
   .dz-univ-back-btn,
   .dz-univ-fs-btn {
-    min-height: 30px;
-    padding: 4px 10px;
-    font-size: 0.75rem;
+    min-height: 30px !important;
+    padding: 3px 10px !important;
+    font-size: 0.72rem;
   }
 
   #dz-universal-controls {
@@ -563,141 +930,8 @@
     padding: 16px 12px;
     gap: 12px;
   }
-}
 
-/* ── 7. SAFE AREA — notch phones only ────────────────────────── */
-
-@media (max-width: 768px) {
-  @supports (padding: env(safe-area-inset-bottom)) {
-
-    body {
-      padding-top: env(safe-area-inset-top);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
-
-    #dz-universal-controls {
-      padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    }
-
-    :fullscreen #dz-universal-controls,
-    :-webkit-full-screen #dz-universal-controls {
-      padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    }
-  }
-}
-
-/* ── 8. TOUCH POINTER — touchscreen devices only ─────────────── */
-
-@media (pointer: coarse) {
-
-  button,
-  .card-btn,
-  .ghp-mode-btn,
-  .ghp-start-btn,
-  .ghp-back-hub,
-  .ghp-back-game,
-  .dz-fs-btn {
-    min-height: 40px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-
-  .chess-square {
-    min-width: 36px;
-    min-height: 36px;
-  }
-}
-
-/* ── Feature 8: Mine tab bar — mobile only ───────────────────── */
-@media (max-width: 768px) {
-  #mine-tab-bar {
-    display: flex;
-    gap: 0;
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto 12px;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
-    flex-shrink: 0;
-  }
-
-  .mine-tab {
-    flex: 1;
-    background: rgba(255,255,255,0.05);
-    border: none;
-    color: rgba(255,255,255,0.45);
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 700;
-    font-size: 0.9rem;
-    padding: 11px 8px;
-    cursor: pointer;
-    transition: background 0.18s, color 0.18s;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    letter-spacing: 0.04em;
-  }
-
-  .mine-tab.active {
-    background: rgba(0,229,255,0.14);
-    color: #00e5ff;
-  }
-
-  .mine-tab:first-child { border-right: 1px solid rgba(255,255,255,0.1); }
-
-  /* On mobile: stack grids and let tabs control visibility */
-  #mine-play > div[style*="display:flex"] {
-    flex-direction: column !important;
-    gap: 0 !important;
-  }
-}
-
-
-/* ── Feature 6: Onboarding — mobile tweaks ───────────────────── */
-@media (max-width: 480px) {
-  #dz-ob-box {
-    padding: 28px 20px 24px;
-  }
-
-  #dz-ob-title { font-size: 1.15rem; }
-  #dz-ob-tips li { font-size: 0.85rem; padding: 8px 12px; }
-  #dz-ob-close { font-size: 0.82rem; padding: 12px 20px; }
-}
-
-
-/* ── Carrom canvas responsive ───────────────────────────────── */
-@media (max-width: 768px) {
-  #carrom-canvas {
-    max-width: 100%;
-    touch-action: none;
-  }
-  #carrom-canvas-wrap {
-    padding: 2px 6px 6px;
-  }
-}
-
-@media (max-width: 480px) {
-  #carrom-score-p,
-  #carrom-score-ai {
-    font-size: 1.3rem !important;
-  }
-  #carrom-timer {
-    font-size: 0.95rem !important;
-  }
-}
-
-/* ════════════════════════════════════════════════════════════════
-   LANDSCAPE PHONE — Wide-canvas game optimizations
-   Targets: Tanks, SpaceDodge, StarCatcher, Bomberman, Tetris,
-            PingPong, Checkers, Territory, Battleship
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── 9. Landscape phone — game-area fills viewport horizontally ── */
-@media screen and (orientation: landscape) and (max-height: 500px) {
-
-  /* Game screens: remove vertical padding to maximize canvas space */
+  /* Game play panels: remove vertical padding to maximize canvas */
   #tanks-play-panel,
   #sd-play-panel,
   #sc-play-panel,
@@ -708,39 +942,39 @@
     justify-content: flex-start;
   }
 
-  /* HUDs: go ultra-compact in landscape */
+  /* HUDs: ultra compact */
   #tanks-hud,
   #sd-hud,
   #sc-hud {
     padding: 3px 8px !important;
-    min-height: 32px;
+    min-height: 28px;
   }
 
-  /* HP bars shrink a bit */
+  /* HP bars: narrower */
   #tanks-hud [style*="width:100px"],
   #sd-p1-hp-bar,
   #sd-p2-hp-bar {
-    width: 70px !important;
+    width: 64px !important;
   }
 
-  /* Canvas: max out available height */
+  /* Canvas: max available height in landscape */
   #tanks-canvas,
   #sd-canvas,
   #sc-canvas,
   #bm-canvas,
   #pp-canvas {
-    max-height: calc(100dvh - 80px);
+    max-height: calc(100dvh - 72px);
     width: auto !important;
     max-width: 100%;
     object-fit: contain;
   }
 
-  /* Tetris: side-by-side boards stay compact */
+  /* Tetris: tighter padding */
   #tetris-play {
     padding: 4px 8px !important;
   }
 
-  /* Mobile controls strip: compact row in landscape */
+  /* Tanks controls: compact row */
   #tanks-mobile-controls {
     padding: 4px 8px !important;
     gap: 8px;
@@ -750,52 +984,36 @@
   #bm-play > div:first-child {
     padding: 4px 8px !important;
   }
+
 }
+/* end landscape 500px */
 
-/* ── 10. Tanks: mobile controls always fill width nicely ───────── */
-@media (max-width: 768px) {
-  #tanks-mobile-controls {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 8px 4px;
-    gap: 8px;
-    width: 100%;
-    box-sizing: border-box;
-  }
 
-  /* Tanks HUD: stack HP bar under label on very small screens */
-  #tanks-p1-hud,
-  #tanks-p2-hud {
-    gap: 5px;
-    flex-wrap: wrap;
-  }
+/* ══════════════════════════════════════════════════════════════
+   § 7  PORTRAIT-SPECIFIC GAME RULES
+   ══════════════════════════════════════════════════════════════ */
 
-  #tanks-p1-hud [style*="width:100px"],
-  #tanks-p2-hud [style*="width:100px"] {
-    width: 70px !important;
-  }
-}
-
-/* ── 11. Tetris: stack panels vertically on portrait phones ──────── */
+/* Tetris: stack panels vertically on portrait phones */
 @media (max-width: 640px) and (orientation: portrait) {
+
   #tetris-play {
     flex-direction: column;
     align-items: center;
     padding: 6px 4px;
   }
 
-  /* Each player panel takes full width, boards centered */
   #tetris-player-1,
   #tetris-player-2 {
     width: 100% !important;
     max-width: 220px;
     margin: 0 auto;
   }
+
 }
 
-/* ── 12. Bomberman: canvas centered with breathing room ──────────── */
+/* Bomberman: canvas centered with breathing room */
 @media (max-width: 560px) {
+
   #bm-canvas {
     display: block;
     margin: 0 auto;
@@ -808,142 +1026,67 @@
     align-items: center;
     min-height: 100dvh;
   }
+
 }
 
-/* ── 13. PingPong: canvas fills width in portrait ────────────────── */
+
+/* ══════════════════════════════════════════════════════════════
+   § 8  SAFE AREA  (notch / home indicator phones)
+   ══════════════════════════════════════════════════════════════ */
+
 @media (max-width: 768px) {
-  #pp-canvas-wrap {
-    width: 100%;
-    padding: 0;
-  }
-  #pp-canvas {
-    width: 100% !important;
-    height: auto !important;
-  }
-  #pp-wrap {
-    padding: 0 4px !important;
-  }
-}
 
-/* ── 14. StarCatcher: canvas fills width ─────────────────────────── */
-@media (max-width: 768px) {
-  #sc-play-panel {
-    padding: 4px 0 !important;
-  }
-  #sc-canvas {
-    display: block;
-    margin: 0 auto;
-  }
-}
+  @supports (padding: env(safe-area-inset-bottom)) {
 
-/* ── 15. SpaceDodge: compact HUD for portrait ────────────────────── */
-@media (max-width: 480px) {
-  #sd-hud {
-    gap: 4px;
-    padding: 4px 6px !important;
-  }
-  #sd-p1-hp-bar,
-  #sd-p2-hp-bar {
-    width: 60px !important;
-  }
-  #sd-timer {
-    font-size: 16px !important;
-  }
-}
+    body {
+      padding-top:   env(safe-area-inset-top);
+      padding-left:  env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
 
-/* ── 16. Rotate prompt polish ─────────────────────────────────────── */
-#dz-rotate-prompt {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
+    #dz-universal-controls {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
 
-/* ── 17. Territory: overflow scroll on tiny screens ──────────────── */
-@media (max-width: 480px) {
-  #tw-grid {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: calc(100vw - 16px);
-  }
-  .tw-cell {
-    min-width: 28px !important;
-    min-height: 28px !important;
-  }
-}
+    :fullscreen #dz-universal-controls,
+    :-webkit-full-screen #dz-universal-controls {
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
 
-/* ── 18. Checkers: board responsive ──────────────────────────────── */
-@media (max-width: 480px) {
-  #ck-board-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: calc(100vw - 16px);
+    /* Hamburger button clears the status bar */
+    #dz-hamburger,
+    .hamburger-btn {
+      top: calc(14px + env(safe-area-inset-top)) !important;
+      right: calc(14px + env(safe-area-inset-right)) !important;
+    }
+
   }
-  #ck-game-area {
-    flex-direction: column !important;
-    align-items: center;
-  }
-  #ck-score-left,
-  #ck-score-right {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-  }
+
 }
 
 
-/* ═══════════════════════════════════════════════════════
-   FIX: 3-bar menu FIXED position, Back button below it
-   Hub back button never overlaps with hamburger menu
-   ═══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   § 9  TOUCH POINTER  (coarse pointer = touchscreen)
+   ══════════════════════════════════════════════════════════════ */
 
-/* Universal top bar: strict flex layout, no overlap */
-#dz-universal-topbar {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 200 !important;
-  flex-wrap: nowrap !important;
-}
+@media (pointer: coarse) {
 
-/* Back button: always on left, never overlaps right-side menu */
-#dz-univ-back {
-  order: 1 !important;
-  flex-shrink: 0 !important;
-  z-index: 201 !important;
-}
+  button,
+  .card-btn,
+  .ghp-mode-btn,
+  .ghp-start-btn,
+  .ghp-back-hub,
+  .ghp-back-game,
+  .dz-fs-btn {
+    min-height: 44px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
 
-/* Game title: center, compressed so it never pushes buttons out */
-#dz-univ-game-title {
-  order: 2 !important;
-  flex: 1 !important;
-  text-align: center !important;
-  overflow: hidden !important;
-  white-space: nowrap !important;
-  text-overflow: ellipsis !important;
-  padding: 0 8px !important;
-  font-size: 0.78rem !important;
-}
+  .chess-square {
+    min-width: 36px;
+    min-height: 36px;
+  }
 
-/* Fullscreen btn: hidden (removed) */
-#dz-univ-fs {
-  display: none !important;
-}
-
-/* 3-bar hamburger menu: ALWAYS fixed top-right, above every game panel */
-#dz-hamburger, .hamburger-btn {
-  position: fixed !important;
-  top: 16px !important;
-  right: 16px !important;
-  left: auto !important;
-  z-index: 9999 !important;
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-/* Menu dropdown opens from top-right */
-#dz-dropdown {
-  z-index: 9998 !important;
 }

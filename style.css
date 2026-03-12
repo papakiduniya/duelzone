@@ -4789,12 +4789,12 @@ html, body {
 }
 
 .cdd-play-wrap {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   background: linear-gradient(160deg, #060818 0%, #0d0f1c 60%, #080d1a 100%);
-  padding: 56px 16px 32px;
+  padding: 0 16px 24px;
   box-sizing: border-box;
 }
 
@@ -4804,7 +4804,8 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding-top: 8px;
 }
 
 /* Header */
@@ -4813,7 +4814,7 @@ html, body {
 }
 #cdd-title {
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 4.5vw, 1.4rem);
   font-weight: 900;
   margin: 0 0 2px;
   background: linear-gradient(90deg, var(--cdd-accent), #ffcc80);
@@ -4823,7 +4824,7 @@ html, body {
 }
 #cdd-mode-label {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   letter-spacing: 0.12em;
   color: var(--cdd-accent);
   margin: 0;
@@ -4835,7 +4836,7 @@ html, body {
 #cdd-scoreboard {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -4844,11 +4845,11 @@ html, body {
   background: #131630;
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: var(--cdd-radius);
-  padding: 12px 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .cdd-score-card.cdd-active-p1 {
@@ -4861,7 +4862,7 @@ html, body {
 }
 .cdd-player-label {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4871,7 +4872,7 @@ html, body {
 #cdd-card-p2 .cdd-player-label { color: var(--cdd-p2); }
 .cdd-score-val {
   font-family: 'Orbitron', sans-serif;
-  font-size: 2rem;
+  font-size: clamp(1.4rem, 5vw, 2rem);
   font-weight: 900;
   color: #f1f5f9;
   line-height: 1;
@@ -4881,7 +4882,7 @@ html, body {
 }
 .cdd-vs {
   font-family: 'Orbitron', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 900;
   color: rgba(255,255,255,0.3);
   letter-spacing: 0.1em;
@@ -4894,12 +4895,12 @@ html, body {
   justify-content: center;
 }
 #cdd-turn-indicator {
-  padding: 8px 22px;
+  padding: 7px 20px;
   border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.03);
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: #94a3b8;
@@ -4930,14 +4931,16 @@ html, body {
   50% { opacity: 0.6; }
 }
 
-/* Grid wrap */
+/* ── Grid wrap ── */
 #cdd-grid-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px 8px;
+  padding: 8px 0;
+  /* Allow scroll only if a very large grid overflows anyway */
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* The dot/line grid — columns/rows set dynamically by JS */
@@ -4945,12 +4948,15 @@ html, body {
   display: grid;
   gap: 0;
   user-select: none;
+  /* touch-action on the grid avoids accidental page scroll while tapping lines */
+  touch-action: none;
 }
 
-/* Dots */
+/* ── Dots ── */
 .cdd-dot {
-  width: 14px;
-  height: 14px;
+  /* Size matches the JS DOT constant (12px); use var if set */
+  width:  var(--cdd-dot-sz, 12px);
+  height: var(--cdd-dot-sz, 12px);
   border-radius: 50%;
   background: var(--cdd-dot);
   box-shadow: 0 0 8px rgba(226,232,240,0.7), 0 0 3px rgba(255,255,255,0.9);
@@ -4960,7 +4966,7 @@ html, body {
   justify-self: center;
 }
 
-/* Lines */
+/* ── Lines ── */
 .cdd-line {
   cursor: pointer;
   position: relative;
@@ -4968,31 +4974,60 @@ html, body {
   align-items: center;
   justify-content: center;
   z-index: 1;
+  /* Eliminate 300 ms tap delay on iOS/Android */
+  touch-action: manipulation;
 }
 .cdd-line.h-line {
-  height: 14px;
-  align-self: center;
+  /* fills the DOT-height row; width comes from CELL column */
+  width:  100%;
+  height: 100%;
+  align-self: stretch;
+  justify-self: stretch;
 }
 .cdd-line.v-line {
-  width: 14px;
-  justify-self: center;
+  /* fills the DOT-width column; height comes from CELL row */
+  width:  100%;
+  height: 100%;
+  align-self: stretch;
+  justify-self: stretch;
 }
 
-/* Inner bar */
+/* ── Expanded invisible touch-target (::before) ──
+   Extends tap area 12px beyond the thin dimension so fingers don't miss.
+   ::after is still used for the visual bar below. */
+.cdd-line::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+}
+.cdd-line.h-line::before {
+  /* expand vertically — the thin dimension for h-lines */
+  top: -12px; bottom: -12px;
+  left: 0;    right: 0;
+}
+.cdd-line.v-line::before {
+  /* expand horizontally — the thin dimension for v-lines */
+  left: -12px; right: -12px;
+  top: 0;      bottom: 0;
+}
+
+/* ── Visual bar (::after) ── */
 .cdd-line::after {
   content: '';
   display: block;
   border-radius: 5px;
   background: var(--cdd-line-empty);
   transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+  position: relative;
+  z-index: 1;
 }
 .cdd-line.h-line::after {
-  width: calc(100% - 6px);
+  width: calc(100% - 4px);
   height: 7px;
 }
 .cdd-line.v-line::after {
   width: 7px;
-  height: calc(100% - 6px);
+  height: calc(100% - 4px);
 }
 .cdd-line:not(.drawn):hover::after,
 .cdd-line:not(.drawn):focus::after {
@@ -5020,7 +5055,7 @@ html, body {
   100% { transform: scale(1);   opacity: 1; }
 }
 
-/* Box cells */
+/* ── Box cells ── */
 .cdd-box {
   position: relative;
   border-radius: 4px;
@@ -5042,7 +5077,7 @@ html, body {
 }
 .cdd-box-label {
   font-family: 'Orbitron', sans-serif;
-  font-size: 0.6rem;
+  font-size: clamp(0.42rem, 1.2vw, 0.6rem);
   font-weight: 900;
   letter-spacing: 0.05em;
   opacity: 0;
@@ -5068,7 +5103,7 @@ html, body {
   100% { transform: scale(1); }
 }
 
-/* Locked grid state */
+/* ── Locked grid state ── */
 #cdd-grid.locked .cdd-line:not(.drawn) {
   cursor: not-allowed;
   pointer-events: none;
@@ -5077,7 +5112,7 @@ html, body {
   background: rgba(255,255,255,0.04);
 }
 
-/* Game over overlay */
+/* ── Game over overlay ── */
 #cdd-result {
   position: fixed;
   inset: 0;
@@ -5098,10 +5133,10 @@ html, body {
   background: #0d1029;
   border: 1px solid rgba(255,145,0,0.25);
   border-radius: 20px;
-  padding: 36px 40px;
+  padding: 28px 28px;
   text-align: center;
-  max-width: 340px;
-  width: 90%;
+  max-width: 320px;
+  width: 88%;
   box-shadow: 0 0 60px -12px rgba(255,145,0,0.3);
   animation: cdd-slide-up 0.4s cubic-bezier(0.34,1.56,0.64,1);
 }
@@ -5110,22 +5145,22 @@ html, body {
   to   { transform: translateY(0)    scale(1);    opacity: 1; }
 }
 #cdd-result-icon {
-  font-size: 3rem;
+  font-size: 2.6rem;
   margin-bottom: 8px;
   line-height: 1;
 }
 #cdd-result-title {
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 900;
   color: #f1f5f9;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 #cdd-result-scores {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: #94a3b8;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 #cdd-result-btns {
   display: flex;
@@ -5134,10 +5169,10 @@ html, body {
 }
 #cdd-result-btns button {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  padding: 10px 20px;
+  padding: 10px 18px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
@@ -5156,18 +5191,19 @@ html, body {
   border: 1px solid rgba(255,255,255,0.1) !important;
 }
 
-/* Controls */
+/* ── Controls ── */
 #cdd-controls {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 2px;
+  justify-content: center;
 }
 #cdd-controls button {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  padding: 9px 20px;
+  padding: 9px 22px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
@@ -5181,26 +5217,6 @@ html, body {
   color: var(--cdd-accent);
 }
 #cdd-reset-btn:hover { background: rgba(255,145,0,0.2); }
-#cdd-hub-btn {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1) !important;
-  color: #64748b;
-}
-#cdd-hub-btn:hover { background: rgba(255,255,255,0.1); color: #94a3b8; }
-
-/* Responsive */
-@media (max-width: 420px) {
-  #cdd-grid {
-    grid-template-columns: 11px 42px 11px 42px 11px 42px 11px;
-    grid-template-rows:    11px 42px 11px 42px 11px 42px 11px;
-  }
-  .cdd-dot { width: 11px; height: 11px; }
-  .cdd-line.h-line { width: 42px; height: 11px; }
-  .cdd-line.v-line { width: 11px; height: 42px; }
-  .cdd-line.h-line::after { width: 38px; height: 5px; }
-  .cdd-line.v-line::after  { width: 5px; height: 38px; }
-  .cdd-box { width: 42px; height: 42px; }
-}
 
 /* ══════════════════════════════════════════════════════════
    CHESS DUEL STYLES
