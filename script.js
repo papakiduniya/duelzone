@@ -2262,30 +2262,88 @@ function cricAddBatterWkt() {
 }
 
 function cricBotPick() {
+  var botIsBatting = !cricPlayerBats; // player bowling = bot batting
+
+  // ── EASY: pure random ────────────────────────────────────────
   if (cricDiff === 'easy') return Math.floor(Math.random() * 10) + 1;
+
+  // ── MEDIUM ───────────────────────────────────────────────────
   if (cricDiff === 'medium') {
-    if (cricPlayerHistory.length > 0 && Math.random() < 0.5) {
+    if (cricPlayerHistory.length > 0 && Math.random() < 0.55) {
       var last = cricPlayerHistory[cricPlayerHistory.length - 1];
-      if (cricMode === 'crazy' && !cricPlayerBats) {
-        var adj = last + (Math.random() < 0.5 ? 1 : -1);
-        return Math.max(1, Math.min(10, adj));
+      if (botIsBatting) {
+        // Bot BATTING — avoid the bowler's (player's) predicted number
+        if (cricMode === 'crazy') {
+          // In crazy mode, OUT = adjacent (±1). Avoid numbers within 1 of last bowler pick.
+          var safe = [];
+          for (var s = 1; s <= 10; s++) {
+            if (Math.abs(s - last) > 1) safe.push(s);
+          }
+          if (safe.length > 0) return safe[Math.floor(Math.random() * safe.length)];
+        } else {
+          // Normal mode, OUT = exact match. Pick anything except last.
+          var alt = Math.floor(Math.random() * 9) + 1;
+          if (alt >= last) alt++;
+          return Math.min(10, alt);
+        }
+      } else {
+        // Bot BOWLING — try to match batter's (player's) predicted number
+        if (cricMode === 'crazy') {
+          // In crazy mode, OUT = adjacent. Pick ±1 of last batter pick.
+          var adjPick = last + (Math.random() < 0.5 ? 1 : -1);
+          return Math.max(1, Math.min(10, adjPick));
+        } else {
+          // Normal mode, OUT = exact match. Copy last batter pick.
+          return last;
+        }
       }
-      return last;
     }
     return Math.floor(Math.random() * 10) + 1;
   }
+
+  // ── HARD ─────────────────────────────────────────────────────
   if (cricPlayerHistory.length >= 3) {
     var freq = {};
     for (var i = 1; i <= 10; i++) freq[i] = 0;
     cricPlayerHistory.forEach(function(n){ freq[n]++; });
+    // Find most-picked number
     var predicted = 1, maxF = 0;
-    for (var k in freq) { if (freq[k] > maxF) { maxF = freq[k]; predicted = parseInt(k); } }
-    if (cricMode === 'crazy' && !cricPlayerBats) {
-      var tries = [predicted - 1, predicted + 1];
-      var pick = tries[Math.floor(Math.random() * 2)];
-      return Math.max(1, Math.min(10, pick));
+    for (var k in freq) {
+      if (freq[k] > maxF) { maxF = freq[k]; predicted = parseInt(k); }
     }
-    if (cricMode === 'normal' && !cricPlayerBats) return predicted;
+    if (botIsBatting) {
+      // Bot BATTING — pick the number LEAST likely to match the bowler
+      if (cricMode === 'crazy') {
+        // Avoid all numbers adjacent to predicted bowler pick
+        var safeNums = [];
+        for (var n = 1; n <= 10; n++) {
+          if (Math.abs(n - predicted) > 1) safeNums.push(n);
+        }
+        if (safeNums.length > 0) {
+          // Among safe numbers, pick the one the bowler bowls LEAST (minimise risk)
+          var bestSafe = safeNums[0], minF2 = Infinity;
+          safeNums.forEach(function(x) { if ((freq[x]||0) < minF2) { minF2 = freq[x]||0; bestSafe = x; } });
+          return bestSafe;
+        }
+      } else {
+        // Normal mode — pick the number the bowler throws LEAST often
+        var leastPicked = 1, minFreq = Infinity;
+        for (var m = 1; m <= 10; m++) {
+          if ((freq[m]||0) < minFreq) { minFreq = freq[m]||0; leastPicked = m; }
+        }
+        return leastPicked;
+      }
+    } else {
+      // Bot BOWLING — aim to get batter out
+      if (cricMode === 'crazy') {
+        // Adjacent = out. Pick ±1 of predicted batter number.
+        var tries = [predicted - 1, predicted + 1].filter(function(x){ return x>=1&&x<=10; });
+        return tries[Math.floor(Math.random() * tries.length)];
+      } else {
+        // Normal mode — pick the most frequent batter number (exact match = out).
+        return predicted;
+      }
+    }
   }
   return Math.floor(Math.random() * 10) + 1;
 }
@@ -2856,9 +2914,20 @@ document.querySelectorAll('.cric-bot-toss-btn').forEach(function(btn) {
       cricBatBowlBtns.classList.remove('hidden');
     } else {
       setTimeout(function() {
-        cricTossWinner.textContent += ' Bot chooses to BAT.';
+        // Bot makes a smart toss decision based on difficulty
+        var botBatsFirst;
+        if (cricDiff === 'easy') {
+          botBatsFirst = Math.random() < 0.5; // random
+        } else if (cricDiff === 'medium') {
+          botBatsFirst = Math.random() < 0.65; // slightly prefers batting
+        } else {
+          // Hard: prefer batting to set a target, but sometimes bowl to chase
+          botBatsFirst = Math.random() < 0.55;
+        }
+        cricTossWinner.textContent += ' Bot chooses to ' + (botBatsFirst ? 'BAT.' : 'BOWL.');
         cricBatBowlBtns.classList.add('hidden');
-        setTimeout(function() { cricStartMatch(false); }, 1000);
+        // botBatsFirst=true means bot bats → P1 (player) does NOT bat first
+        setTimeout(function() { cricStartMatch(!botBatsFirst); }, 1000);
       }, 800);
     }
   });

@@ -1633,7 +1633,16 @@ html, body {
   #screen-tapbattle { padding-bottom: 0; }
   #tap-arena { min-height: 340px; }
   .tap-count { font-size: 3.5rem; }
-  .rps-btn { padding: 14px 6px; }
+  .rps-btn {
+    padding: 10px 4px;
+    min-width: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+  }
+  .rps-btn > span:first-child,
+  .rps-btn .rps-btn-emoji { font-size: 1.5rem; }
+  .rps-btn span { font-size: 0.6rem; letter-spacing: 0.04em; }
+  .rps-btn-row { gap: 6px; }
 }
 
 /* ════════════════════════════════════════════════════════════

@@ -1,495 +1,448 @@
-// ═══════════════════════════════════════════════════════════════
-// DuelZone · Minesweeper Duel  (minesweeper.js)  — TURN-BASED
-// Both players share ONE grid. Take turns revealing cells.
-// Hit a mine = -1 life, opponent +2pts. Safe cell = +1pt.
-// Most points when board cleared = winner.
-// Uses ONLY the existing HTML elements (no new DOM needed).
-// ═══════════════════════════════════════════════════════════════
-(function(){
+// ═══════════════════════════════════════════════════════
+//  MINESWEEPER — Mobile-First Edition
+//  Solo classic minesweeper, touch-optimised
+// ═══════════════════════════════════════════════════════
+
+(function () {
   'use strict';
 
-  var CONFIGS={
-    easy:   {cols:9, rows:9, mines:10},
-    medium: {cols:12,rows:10,mines:20},
-    hard:   {cols:16,rows:12,mines:40},
+  // ── Config ───────────────────────────────────────────
+  var DIFFS = {
+    easy:   { rows: 9,  cols: 9,  mines: 10 },
+    medium: { rows: 16, cols: 12, mines: 25 },
+    hard:   { rows: 20, cols: 14, mines: 50 }
   };
 
-  var MS={
-    mode:'pvp', diff:'easy', over:false, botDiff:'medium',
-    grid:null,
-    currentTurn:0,
-    scores:[0,0],
-    lives:[3,3],
-    flagMode:[false,false],
-    botInterval:null,
-    firstClick:false,
+  // ── State ────────────────────────────────────────────
+  var ms = {
+    diff:      'easy',
+    rows:      0,
+    cols:      0,
+    mines:     0,
+    board:     [],   // flat array of cell objects
+    revealed:  0,
+    flagged:   0,
+    safeTotal: 0,
+    started:   false,
+    over:      false,
+    won:       false,
+    flagMode:  false,
+    timerVal:  0,
+    timerID:   null
   };
 
-  var _wired=false;
-  var _bot=null;
+  // ── DOM helpers ──────────────────────────────────────
+  function q(id)  { return document.getElementById(id); }
 
-  // Repurpose tab buttons as turn indicator
-  window.mineShowTab=function(pid){ /* no-op in turn-based */ };
-
-  window.mineInit=function(){
-    if(!_wired){mineWireUI();_wired=true;}
-    mineShowHome();
-  };
-  window.mineDestroy=function(){ mineClearTimers(); };
-
-  function el(id){return document.getElementById(id);}
-  function on(id,fn){var e=el(id);if(e)e.addEventListener('click',fn);}
-  function setText(id,v){var e=el(id);if(e)e.textContent=v;}
-
-  function mineShowHome(){
-    window.scrollTo(0,0);
-    el('mine-home').classList.remove('hidden');
-    el('mine-play').classList.add('hidden');
-    // Hide the fixed back button when not in game
-    var backBtn=el('mine-back-play'); if(backBtn) backBtn.style.display='none';
-  }
-
-  function mineWireUI(){
-    on('mine-back-hub',   function(){mineClearTimers();showHub();});
-    on('mine-back-play',  function(){mineClearTimers();mineShowHome();});
-    on('mine-again',      function(){mineStartGame();});
-    on('mine-result-hub', function(){mineClearTimers();showHub();});
-
-    on('mine-mode-pvp', function(){
-      MS.mode='pvp';
-      el('mine-mode-pvp').classList.add('active');
-      el('mine-mode-bot').classList.remove('active');
-      var bs=el('mine-bot-settings'); if(bs) bs.classList.add('hidden');
-    });
-    on('mine-mode-bot', function(){
-      MS.mode='bot';
-      el('mine-mode-bot').classList.add('active');
-      el('mine-mode-pvp').classList.remove('active');
-      var bs=el('mine-bot-settings'); if(bs) bs.classList.remove('hidden');
-    });
-    on('mine-start-btn', function(){mineStartGame();});
-
-    document.querySelectorAll('.mine-diff').forEach(function(b){
-      b.addEventListener('click',function(){
-        document.querySelectorAll('.mine-diff').forEach(function(x){x.classList.remove('active');});
-        b.classList.add('active'); MS.diff=b.dataset.diff;
-      });
-    });
-    document.querySelectorAll('.mine-bot-diff').forEach(function(b){
-      b.addEventListener('click',function(){
-        document.querySelectorAll('.mine-bot-diff').forEach(function(x){x.classList.remove('active');});
-        b.classList.add('active'); MS.botDiff=b.dataset.bdiff||'medium';
+  // ── Init / wiring ────────────────────────────────────
+  (function wire() {
+    // Difficulty pills
+    document.querySelectorAll('.mine-diff').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.mine-diff').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        ms.diff = btn.getAttribute('data-diff');
       });
     });
 
-    on('mine-flag-p1',function(){
-      if(MS.currentTurn!==0||MS.over) return;
-      MS.flagMode[0]=!MS.flagMode[0]; updateFlagBtn(0);
+    // Start
+    var startBtn = q('mine-start-btn');
+    if (startBtn) startBtn.addEventListener('click', mineStartGame);
+
+    // Back from home to hub
+    var backHub = q('mine-back-hub');
+    if (backHub) backHub.addEventListener('click', function () {
+      if (typeof showHub === 'function') showHub();
     });
-    on('mine-flag-p2',function(){
-      if(MS.currentTurn!==1||MS.over||MS.mode==='bot') return;
-      MS.flagMode[1]=!MS.flagMode[1]; updateFlagBtn(1);
+
+    // Back during play → home panel
+    var backPlay = q('mine-back-play');
+    if (backPlay) backPlay.addEventListener('click', mineBackToHome);
+
+    // Result hub
+    var resHub = q('mine-result-hub');
+    if (resHub) resHub.addEventListener('click', function () {
+      if (typeof showHub === 'function') showHub();
     });
+  })();
+
+  // ── Public API (called from HTML) ───────────────────
+  window.mineToggleFlag = function () { msFlagToggle(); };
+  window.mineNewGame    = function () { mineStartGame(); };
+
+  // ── Start / reset game ───────────────────────────────
+  function mineStartGame() {
+    var cfg = DIFFS[ms.diff] || DIFFS.easy;
+    ms.rows      = cfg.rows;
+    ms.cols      = cfg.cols;
+    ms.mines     = cfg.mines;
+    ms.board     = [];
+    ms.revealed  = 0;
+    ms.flagged   = 0;
+    ms.safeTotal = ms.rows * ms.cols - ms.mines;
+    ms.started   = false;
+    ms.over      = false;
+    ms.won       = false;
+    ms.flagMode  = false;
+
+    msStopTimer();
+    ms.timerVal  = 0;
+
+    // Show play panel
+    var home = q('mine-home'), play = q('mine-play');
+    if (home) home.classList.add('hidden');
+    if (play) play.classList.remove('hidden');
+    var bp = q('mine-back-play'); if (bp) bp.style.display = 'block';
+
+    // Hide result
+    var res = q('mine-result'); if (res) res.classList.add('hidden');
+
+    // Reset flag toggle UI
+    var ft = q('mine-flag-toggle');
+    if (ft) { ft.textContent = '🚩 Flag Mode: OFF'; ft.style.borderColor = 'rgba(255,255,255,0.2)'; ft.style.color = 'rgba(255,255,255,0.7)'; }
+
+    // Build blank board (no mines yet — placed on first tap)
+    for (var i = 0; i < ms.rows * ms.cols; i++) {
+      ms.board.push({ mine: false, revealed: false, flagged: false, adj: 0 });
+    }
+
+    msUpdateHUD();
+    msRenderGrid();
   }
 
-  function mineClearTimers(){
-    if(MS.botInterval){ clearTimeout(MS.botInterval); clearInterval(MS.botInterval); MS.botInterval=null; }
-    if(_bot&&_bot.stepTimer){ clearTimeout(_bot.stepTimer); _bot.stepTimer=null; }
-    _bot=null;
+  function mineBackToHome() {
+    msStopTimer();
+    var home = q('mine-home'), play = q('mine-play');
+    if (play) play.classList.add('hidden');
+    if (home) home.classList.remove('hidden');
+    var bp = q('mine-back-play'); if (bp) bp.style.display = 'none';
   }
 
-  function mineStartGame(){
-    mineClearTimers();
-    window.scrollTo(0,0);
-    var playEl=el('mine-play');
-    if(playEl){ playEl.classList.remove('hidden'); playEl.scrollTop=0; }
-    el('mine-home').classList.add('hidden');
-    el('mine-result').classList.add('hidden');
-    // Show the fixed back button
-    var backBtn=el('mine-back-play'); if(backBtn) backBtn.style.display='block';
-
-    MS.over=false; MS.currentTurn=0; MS.scores=[0,0]; MS.lives=[3,3];
-    MS.flagMode=[false,false]; MS.firstClick=false;
-
-    // Hide P2 grid section — single shared grid in P1 container
-    var p2sec=el('mine-p2-section'); if(p2sec) p2sec.style.display='none';
-    // Hide mobile tabs (not needed in turn-based)
-    var tabs=document.querySelector('.mine-tabs'); if(tabs) tabs.style.display='none';
-
-    var cfg=CONFIGS[MS.diff];
-    var mineSet=generateMines(cfg.cols,cfg.rows,cfg.mines);
-    MS.grid=buildGrid(cfg.cols,cfg.rows,mineSet);
-
-    // Repurpose P2 name label
-    setText('mine-p2-name', MS.mode==='bot'?'🤖 Bot':'Player 2');
-
-    updateFlagBtn(0); updateFlagBtn(1);
-    updateTurnIndicator();
-    updateScoreDisplay();
-    renderGrid();
-
-    if(MS.mode==='bot'&&MS.currentTurn===1) scheduleBotTurn();
-  }
-
-  // ── Grid generation ──────────────────────────────────────────
-
-  function generateMines(cols,rows,count){
-    var all=[];
-    for(var r=0;r<rows;r++) for(var c=0;c<cols;c++) all.push({r:r,c:c});
-    shuffle(all);
-    var mines={};
-    all.slice(0,count).forEach(function(m){mines[m.r+','+m.c]=true;});
-    return mines;
-  }
-
-  function buildGrid(cols,rows,mineSet){
-    var cfg=CONFIGS[MS.diff];
-    var cells=[];
-    for(var r=0;r<rows;r++){
-      cells[r]=[];
-      for(var c=0;c<cols;c++){
-        cells[r][c]={mine:!!mineSet[r+','+c],revealed:false,flagged:false,adj:0};
+  // ── Mine placement (deferred to first tap) ───────────
+  function msPlaceMines(safeIdx) {
+    var total = ms.rows * ms.cols;
+    var placed = 0;
+    // Exclude safe cell + all its neighbours from mine placement
+    var safe = {};
+    safe[safeIdx] = true;
+    var sr = Math.floor(safeIdx / ms.cols), sc = safeIdx % ms.cols;
+    for (var dr = -1; dr <= 1; dr++) {
+      for (var dc = -1; dc <= 1; dc++) {
+        var rr = sr + dr, cc = sc + dc;
+        if (rr >= 0 && rr < ms.rows && cc >= 0 && cc < ms.cols) {
+          safe[rr * ms.cols + cc] = true;
+        }
       }
     }
-    for(var r2=0;r2<rows;r2++) for(var c2=0;c2<cols;c2++){
-      if(cells[r2][c2].mine) continue;
-      var cnt=0;
-      forNeighbors(r2,c2,rows,cols,function(nr,nc){if(cells[nr][nc].mine)cnt++;});
-      cells[r2][c2].adj=cnt;
+    var candidates = [];
+    for (var i = 0; i < total; i++) { if (!safe[i]) candidates.push(i); }
+    // Fisher-Yates shuffle, take first ms.mines
+    for (var j = candidates.length - 1; j > 0; j--) {
+      var k = Math.floor(Math.random() * (j + 1));
+      var tmp = candidates[j]; candidates[j] = candidates[k]; candidates[k] = tmp;
     }
-    return{cells:cells,rows:rows,cols:cols,mines:cfg.mines,flagCount:0,
-           totalSafe:cols*rows-cfg.mines,clearedSafe:0};
-  }
-
-  function forNeighbors(r,c,rows,cols,fn){
-    for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
-      if(dr===0&&dc===0) continue;
-      var nr=r+dr,nc=c+dc;
-      if(nr>=0&&nr<rows&&nc>=0&&nc<cols) fn(nr,nc);
-    }
-  }
-
-  // ── Display helpers using existing elements ───────────────────
-
-  function getPlayerName(pid){
-    return pid===0?'Player 1':(MS.mode==='bot'?'Bot':'Player 2');
-  }
-
-  // Repurpose tab buttons as turn indicator
-  function updateTurnIndicator(){
-    var t1=el('mine-tab-p1'), t2=el('mine-tab-p2');
-    if(t1){
-      t1.textContent='🔵 P1'+(MS.currentTurn===0?' ← TURN':'');
-      t1.style.background=MS.currentTurn===0?'rgba(0,229,255,0.25)':'rgba(255,255,255,0.04)';
-      t1.style.borderColor=MS.currentTurn===0?'rgba(0,229,255,0.7)':'rgba(255,255,255,0.1)';
-      t1.style.color=MS.currentTurn===0?'#00e5ff':'rgba(255,255,255,0.35)';
-    }
-    if(t2){
-      var p2n=MS.mode==='bot'?'🤖 Bot':'🔴 P2';
-      t2.textContent=p2n+(MS.currentTurn===1?' ← TURN':'');
-      t2.style.background=MS.currentTurn===1?'rgba(245,0,87,0.2)':'rgba(255,255,255,0.04)';
-      t2.style.borderColor=MS.currentTurn===1?'rgba(245,0,87,0.6)':'rgba(255,255,255,0.1)';
-      t2.style.color=MS.currentTurn===1?'#f50057':'rgba(255,255,255,0.35)';
-    }
-    // Show tabs
-    var tabs=document.querySelector('.mine-tabs'); if(tabs) tabs.style.display='flex';
-  }
-
-  function updateScoreDisplay(){
-    // P1: mines-p1 = lives+score, pct-p1 = score, prog-p1 = board progress
-    setText('mine-mines-p1','❤️ '+MS.lives[0]+'  ⭐ '+MS.scores[0]);
-    setText('mine-pct-p1','⭐ '+MS.scores[0]);
-    // P2: mines-p2 = lives+score, pct-p2 = score
-    setText('mine-mines-p2','❤️ '+MS.lives[1]+'  ⭐ '+MS.scores[1]);
-    setText('mine-pct-p2','⭐ '+MS.scores[1]);
-    // Progress bar = board cleared %
-    var g=MS.grid;
-    var pct=g?Math.round(g.clearedSafe/g.totalSafe*100):0;
-    var b1=el('mine-prog-p1'); if(b1) b1.style.width=pct+'%';
-    var b2=el('mine-prog-p2'); if(b2) b2.style.width=(MS.lives[1]/3*100)+'%';
-  }
-
-  function updateFlagBtn(pid){
-    var btn=el('mine-flag-p'+(pid+1)); if(!btn) return;
-    btn.textContent=(MS.flagMode[pid]?'🚩 Flag: ON':'🚩 Flag: OFF');
-    btn.classList.toggle('mine-flag-active',!!MS.flagMode[pid]);
-    btn.disabled=(MS.currentTurn!==pid||MS.over||(pid===1&&MS.mode==='bot'));
-  }
-
-  // ── Render shared grid in P1 container ───────────────────────
-
-  function renderGrid(){
-    var g=MS.grid; if(!g) return;
-    var container=el('mine-grid-p1'); if(!container) return;
-    container.innerHTML='';
-    container.style.gridTemplateColumns='repeat('+g.cols+',1fr)';
-
-    var botsTurn=MS.mode==='bot'&&MS.currentTurn===1;
-    var locked=MS.over||botsTurn;
-
-    for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++){
-      (function(row,col){
-        var cell=document.createElement('button');
-        cell.className='mine-cell';
-        var d=g.cells[row][col];
-        if(d.revealed){
-          cell.classList.add('mine-revealed');
-          if(d.mine){ cell.textContent='💣'; cell.classList.add('mine-hit'); }
-          else if(d.adj>0){ cell.textContent=d.adj; cell.classList.add('mine-n'+d.adj); }
-        } else if(d.flagged){
-          cell.textContent='🚩'; cell.classList.add('mine-flagged');
+    for (var m = 0; m < ms.mines; m++) ms.board[candidates[m]].mine = true;
+    // Compute adjacency numbers
+    for (var idx = 0; idx < total; idx++) {
+      if (ms.board[idx].mine) continue;
+      var adj = 0;
+      var row = Math.floor(idx / ms.cols), col = idx % ms.cols;
+      for (var dr2 = -1; dr2 <= 1; dr2++) {
+        for (var dc2 = -1; dc2 <= 1; dc2++) {
+          if (dr2 === 0 && dc2 === 0) continue;
+          var nr = row + dr2, nc = col + dc2;
+          if (nr >= 0 && nr < ms.rows && nc >= 0 && nc < ms.cols) {
+            if (ms.board[nr * ms.cols + nc].mine) adj++;
+          }
         }
-        if(locked||d.revealed) cell.disabled=true;
-        cell.addEventListener('click',function(e){
-          e.preventDefault();
-          if(MS.over||locked) return;
-          var pid=MS.currentTurn;
-          if(MS.flagMode[pid]) toggleFlag(row,col);
-          else revealCell(pid,row,col);
-        });
-        cell.addEventListener('contextmenu',function(e){
-          e.preventDefault();
-          if(MS.over||locked) return;
-          toggleFlag(row,col);
-        });
-        container.appendChild(cell);
-      })(r,c);
-    }
-  }
-
-  // ── Turn switching ────────────────────────────────────────────
-
-  function switchTurn(){
-    MS.currentTurn=MS.currentTurn===0?1:0;
-    MS.flagMode=[false,false];
-    updateFlagBtn(0); updateFlagBtn(1);
-    updateTurnIndicator();
-    renderGrid();
-    if(MS.mode==='bot'&&MS.currentTurn===1&&!MS.over) scheduleBotTurn();
-  }
-
-  function showTempMsg(msg){
-    var t1=el('mine-tab-p1'),t2=el('mine-tab-p2');
-    var prev1=t1?t1.textContent:'',prev2=t2?t2.textContent:'';
-    if(t1){ t1.textContent=msg; t1.style.color='#facc15'; }
-    if(t2){ t2.textContent=''; }
-    setTimeout(function(){
-      if(!MS.over) updateTurnIndicator();
-    },1100);
-  }
-
-  // ── Reveal logic ─────────────────────────────────────────────
-
-  function revealCell(pid,r,c){
-    var g=MS.grid;
-    var d=g.cells[r][c];
-    if(d.revealed||d.flagged||MS.over) return;
-
-    if(!MS.firstClick){
-      if(d.mine) moveMine(g,r,c);
-      MS.firstClick=true;
-    }
-
-    d.revealed=true;
-
-    if(d.mine){
-      MS.lives[pid]--;
-      MS.scores[1-pid]+=2;
-      // Briefly show all mines then re-hide them
-      revealAllMines();
-      renderGrid(); updateScoreDisplay();
-      if(typeof SoundManager!=='undefined'&&SoundManager.lose) SoundManager.lose();
-
-      if(MS.lives[pid]<=0){
-        endGame(1-pid,'💣 '+getPlayerName(pid)+' is out of lives!');
-        return;
       }
-      showTempMsg('💥 '+getPlayerName(pid)+' hit a mine!');
-      setTimeout(function(){
-        if(MS.over) return;
-        // Re-hide mines
-        for(var rr=0;rr<g.rows;rr++) for(var cc=0;cc<g.cols;cc++){
-          if(g.cells[rr][cc].mine) g.cells[rr][cc].revealed=false;
+      ms.board[idx].adj = adj;
+    }
+  }
+
+  // ── Reveal logic ─────────────────────────────────────
+  function msReveal(idx) {
+    var cell = ms.board[idx];
+    if (cell.revealed || cell.flagged) return;
+
+    // First tap — place mines now so first click is safe
+    if (!ms.started) {
+      ms.started = true;
+      msPlaceMines(idx);
+      msStartTimer();
+      // Recalculate adj for this cell after mines placed
+      var row = Math.floor(idx / ms.cols), col = idx % ms.cols;
+      var adj = 0;
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = row + dr, nc = col + dc;
+          if (nr >= 0 && nr < ms.rows && nc >= 0 && nc < ms.cols) {
+            if (ms.board[nr * ms.cols + nc].mine) adj++;
+          }
         }
-        switchTurn();
-      },1200);
+      }
+      ms.board[idx].adj = adj;
+    }
+
+    cell.revealed = true;
+    ms.revealed++;
+
+    if (cell.mine) {
+      msGameOver(false);
       return;
     }
 
-    MS.scores[pid]++;
-    if(d.adj===0) floodReveal(pid,r,c);
-    g.clearedSafe=countCleared();
-    renderGrid(); updateScoreDisplay();
-
-    if(g.clearedSafe>=g.totalSafe){
-      var w=MS.scores[0]>MS.scores[1]?0:(MS.scores[1]>MS.scores[0]?1:-1);
-      endGame(w,'All cells cleared!');
-      return;
+    // Flood-fill on empty cells
+    if (cell.adj === 0) {
+      var row2 = Math.floor(idx / ms.cols), col2 = idx % ms.cols;
+      for (var dr2 = -1; dr2 <= 1; dr2++) {
+        for (var dc2 = -1; dc2 <= 1; dc2++) {
+          if (dr2 === 0 && dc2 === 0) continue;
+          var nr2 = row2 + dr2, nc2 = col2 + dc2;
+          if (nr2 >= 0 && nr2 < ms.rows && nc2 >= 0 && nc2 < ms.cols) {
+            var ni = nr2 * ms.cols + nc2;
+            if (!ms.board[ni].revealed && !ms.board[ni].flagged) msReveal(ni);
+          }
+        }
+      }
     }
-    setTimeout(function(){ if(!MS.over) switchTurn(); },300);
+
+    if (ms.revealed >= ms.safeTotal) msGameOver(true);
   }
 
-  function moveMine(g,r,c){
-    for(var nr=0;nr<g.rows;nr++) for(var nc=0;nc<g.cols;nc++){
-      if(!g.cells[nr][nc].mine&&!(nr===r&&nc===c)){
-        g.cells[r][c].mine=false; g.cells[nr][nc].mine=true; recalcAdj(g); return;
+  // ── Flag logic ───────────────────────────────────────
+  function msFlag(idx) {
+    var cell = ms.board[idx];
+    if (cell.revealed) return;
+    cell.flagged = !cell.flagged;
+    ms.flagged += cell.flagged ? 1 : -1;
+    msUpdateHUD();
+    msRenderCell(idx);
+  }
+
+  function msFlagToggle() {
+    ms.flagMode = !ms.flagMode;
+    var ft = q('mine-flag-toggle');
+    if (ft) {
+      if (ms.flagMode) {
+        ft.textContent = '🚩 Flag Mode: ON';
+        ft.style.borderColor = '#ef4444';
+        ft.style.color = '#ef4444';
+      } else {
+        ft.textContent = '🚩 Flag Mode: OFF';
+        ft.style.borderColor = 'rgba(255,255,255,0.2)';
+        ft.style.color = 'rgba(255,255,255,0.7)';
       }
     }
   }
 
-  function recalcAdj(g){
-    for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++){
-      if(g.cells[r][c].mine){g.cells[r][c].adj=0;continue;}
-      var cnt=0;
-      forNeighbors(r,c,g.rows,g.cols,function(nr,nc){if(g.cells[nr][nc].mine)cnt++;});
-      g.cells[r][c].adj=cnt;
-    }
-  }
-
-  function floodReveal(pid,r,c){
-    var g=MS.grid;
-    var queue=[{r:r,c:c}];
-    while(queue.length){
-      var cur=queue.shift();
-      forNeighbors(cur.r,cur.c,g.rows,g.cols,function(nr,nc){
-        var nd=g.cells[nr][nc];
-        if(!nd.revealed&&!nd.mine&&!nd.flagged){
-          nd.revealed=true; MS.scores[pid]++; g.clearedSafe++;
-          if(nd.adj===0) queue.push({r:nr,c:nc});
+  // ── Chord: reveal neighbours of a revealed numbered cell ─
+  function msChord(idx) {
+    var cell = ms.board[idx];
+    if (!cell.revealed || cell.adj === 0) return;
+    var row = Math.floor(idx / ms.cols), col = idx % ms.cols;
+    // Count flags around
+    var flags = 0;
+    var neighbours = [];
+    for (var dr = -1; dr <= 1; dr++) {
+      for (var dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        var nr = row + dr, nc = col + dc;
+        if (nr >= 0 && nr < ms.rows && nc >= 0 && nc < ms.cols) {
+          var ni = nr * ms.cols + nc;
+          neighbours.push(ni);
+          if (ms.board[ni].flagged) flags++;
         }
+      }
+    }
+    if (flags === cell.adj) {
+      neighbours.forEach(function(ni) {
+        if (!ms.board[ni].flagged && !ms.board[ni].revealed) msReveal(ni);
       });
     }
   }
 
-  function toggleFlag(r,c){
-    var g=MS.grid; var d=g.cells[r][c];
-    if(d.revealed) return;
-    d.flagged=!d.flagged; g.flagCount+=d.flagged?1:-1;
-    renderGrid();
-  }
+  // ── Game over ────────────────────────────────────────
+  function msGameOver(won) {
+    ms.over = true;
+    ms.won  = won;
+    msStopTimer();
 
-  function countCleared(){
-    var g=MS.grid,cnt=0;
-    for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++) if(g.cells[r][c].revealed&&!g.cells[r][c].mine) cnt++;
-    return cnt;
-  }
-
-  function revealAllMines(){
-    var g=MS.grid;
-    for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++) if(g.cells[r][c].mine) g.cells[r][c].revealed=true;
-  }
-
-  // ── End game ─────────────────────────────────────────────────
-
-  function endGame(winner,detail){
-    if(MS.over) return;
-    MS.over=true; mineClearTimers();
-    var icon=winner===-1?'🤝':'🏆';
-    var wname=winner===-1?'Draw':getPlayerName(winner);
-    el('mine-result-title').textContent=icon+' '+wname+(winner>=0?' Wins!':'');
-    el('mine-result-detail').textContent=(detail||'')+' | Final: ⭐'+MS.scores[0]+' – ⭐'+MS.scores[1];
-    var mw=el('mine-mock-wrap'),tc=el('mine-tip-card');
-    if(mw) mw.classList.add('hidden');
-    if(tc) tc.classList.add('hidden');
-    el('mine-result').classList.remove('hidden');
-    if(typeof SoundManager!=='undefined'&&SoundManager.win) SoundManager.win();
-  }
-
-  // ── Bot ───────────────────────────────────────────────────────
-
-  function scheduleBotTurn(){
-    if(MS.over||MS.currentTurn!==1) return;
-    var delay={easy:1200,medium:800,hard:350}[MS.botDiff]||800;
-    MS.botInterval=setTimeout(function(){
-      if(!MS.over&&MS.currentTurn===1) doBotTurn();
-    },delay+Math.random()*250);
-  }
-
-  function doBotTurn(){
-    if(MS.over||MS.currentTurn!==1) return;
-    var g=MS.grid;
-    _bot={knownMines:{},safeQueue:[],stepTimer:null};
-    botSolve(g);
-    var choice=_bot.safeQueue.length>0?_bot.safeQueue.shift():botPickGuess(g);
-    if(!choice){ endGame(MS.scores[0]>MS.scores[1]?0:1,'No moves left'); return; }
-    revealCell(1,choice.r,choice.c);
-  }
-
-  function botSolve(g){
-    var changed=true;
-    while(changed){
-      changed=false;
-      var constraints=[];
-      for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++){
-        var d=g.cells[r][c];
-        if(!d.revealed||d.mine||d.adj===0) continue;
-        var unk=[],flagged=0;
-        forNeighbors(r,c,g.rows,g.cols,function(nr,nc){
-          var nd=g.cells[nr][nc]; if(nd.revealed) return;
-          var key=nr+','+nc;
-          if(nd.flagged||_bot.knownMines[key]){flagged++;return;}
-          unk.push({r:nr,c:nc,key:key});
-        });
-        var rem=d.adj-flagged;
-        if(rem<=0&&unk.length>0) unk.forEach(function(cell){if(!botInSafeQueue(cell)){_bot.safeQueue.push(cell);changed=true;}});
-        if(rem>0&&rem===unk.length) unk.forEach(function(cell){if(!_bot.knownMines[cell.key]){_bot.knownMines[cell.key]=true;changed=true;}});
-        if(rem>0&&unk.length>0) constraints.push({cells:unk,mines:rem});
+    // Reveal all mines on loss
+    if (!won) {
+      for (var i = 0; i < ms.board.length; i++) {
+        if (ms.board[i].mine) ms.board[i].revealed = true;
       }
-      if(MS.botDiff!=='easy'){
-        for(var i=0;i<constraints.length;i++) for(var j=0;j<constraints.length;j++){
-          if(i===j) continue;
-          var A=constraints[i],B=constraints[j];
-          if(A.cells.length>=B.cells.length) continue;
-          var aKeys={};
-          A.cells.forEach(function(x){aKeys[x.key]=true;});
-          if(!A.cells.every(function(x){return B.cells.some(function(y){return y.key===x.key;});})) continue;
-          var diff2=B.cells.filter(function(x){return !aKeys[x.key];});
-          var dm=B.mines-A.mines;
-          if(dm<0||dm>diff2.length) continue;
-          if(dm===0) diff2.forEach(function(cell){if(!botInSafeQueue(cell)){_bot.safeQueue.push(cell);changed=true;}});
-          if(dm===diff2.length) diff2.forEach(function(cell){if(!_bot.knownMines[cell.key]){_bot.knownMines[cell.key]=true;changed=true;}});
+    }
+
+    msRenderGrid();
+    msUpdateHUD();
+
+    var icon   = q('mine-result-icon');
+    var title  = q('mine-result-title');
+    var detail = q('mine-result-detail');
+    var res    = q('mine-result');
+
+    if (icon)   icon.textContent   = won ? '🏆' : '💥';
+    if (title)  title.textContent  = won ? 'YOU WIN!' : 'BOOM!';
+    if (detail) detail.textContent = won
+      ? 'Cleared in ' + ms.timerVal + 's — nice work!'
+      : 'Better luck next time. Watch those mines!';
+
+    if (res) {
+      res.classList.remove('hidden');
+      res.style.display = 'flex';
+    }
+  }
+
+  // ── Timer ────────────────────────────────────────────
+  function msStartTimer() {
+    ms.timerVal = 0;
+    msStopTimer();
+    ms.timerID = setInterval(function () {
+      ms.timerVal++;
+      var el = q('mine-timer'); if (el) el.textContent = ms.timerVal;
+    }, 1000);
+  }
+
+  function msStopTimer() {
+    if (ms.timerID) { clearInterval(ms.timerID); ms.timerID = null; }
+  }
+
+  // ── HUD update ───────────────────────────────────────
+  function msUpdateHUD() {
+    var remaining = ms.mines - ms.flagged;
+    var cntEl = q('mine-count'); if (cntEl) cntEl.textContent = remaining;
+    var prog = q('mine-progress');
+    if (prog) prog.style.width = (ms.safeTotal > 0 ? (ms.revealed / ms.safeTotal * 100) : 0) + '%';
+    var timerEl = q('mine-timer'); if (timerEl) timerEl.textContent = ms.timerVal;
+  }
+
+  // ── Rendering ────────────────────────────────────────
+  var NUM_COLORS = ['','#4fc3f7','#81c784','#e57373','#7986cb','#ef9a9a','#4dd0e1','#000','#546e7a'];
+
+  function msCellSize() {
+    // Dynamically compute cell size so the full grid fits the viewport
+    var vw = window.innerWidth  || 360;
+    var vh = window.innerHeight || 640;
+    // Available area minus HUD (~130px top) and padding
+    var availW = vw - 16;
+    var availH = vh - 140;
+    var byWidth  = Math.floor((availW - (ms.cols - 1) * 2) / ms.cols);
+    var byHeight = Math.floor((availH - (ms.rows - 1) * 2) / ms.rows);
+    // Clamp between 22 and 42 px — comfortable touch target
+    return Math.max(22, Math.min(42, Math.min(byWidth, byHeight)));
+  }
+
+  function msRenderGrid() {
+    var grid = q('mine-grid');
+    if (!grid) return;
+    var sz = msCellSize();
+    grid.style.gridTemplateColumns = 'repeat(' + ms.cols + ', ' + sz + 'px)';
+    grid.innerHTML = '';
+
+    for (var i = 0; i < ms.board.length; i++) {
+      var el = msBuildCell(i, sz);
+      grid.appendChild(el);
+    }
+  }
+
+  function msRenderCell(idx) {
+    var grid = q('mine-grid');
+    if (!grid) return;
+    var sz = msCellSize();
+    var old = grid.children[idx];
+    if (!old) return;
+    var el = msBuildCell(idx, sz);
+    grid.replaceChild(el, old);
+  }
+
+  function msBuildCell(idx, sz) {
+    var cell  = ms.board[idx];
+    var el    = document.createElement('div');
+    el.style.cssText = [
+      'width:' + sz + 'px',
+      'height:' + sz + 'px',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'border-radius:4px',
+      'cursor:pointer',
+      'font-family:Orbitron,sans-serif',
+      'font-weight:700',
+      'font-size:' + Math.round(sz * 0.48) + 'px',
+      'transition:background 0.08s',
+      'box-sizing:border-box',
+      '-webkit-tap-highlight-color:transparent',
+      'touch-action:none'
+    ].join(';');
+
+    if (cell.revealed) {
+      if (cell.mine) {
+        el.style.background = '#7f1d1d';
+        el.style.border = '1px solid #ef4444';
+        el.textContent = '💣';
+        el.style.fontSize = Math.round(sz * 0.52) + 'px';
+      } else {
+        el.style.background = 'rgba(255,255,255,0.06)';
+        el.style.border = '1px solid rgba(255,255,255,0.08)';
+        if (cell.adj > 0) {
+          el.textContent = cell.adj;
+          el.style.color = NUM_COLORS[cell.adj] || '#fff';
         }
       }
+    } else if (cell.flagged) {
+      el.style.background = 'rgba(239,68,68,0.18)';
+      el.style.border = '1.5px solid rgba(239,68,68,0.6)';
+      el.textContent = '🚩';
+      el.style.fontSize = Math.round(sz * 0.52) + 'px';
+    } else {
+      el.style.background = 'rgba(255,255,255,0.09)';
+      el.style.border = '1px solid rgba(255,255,255,0.14)';
     }
+
+    if (!ms.over) {
+      // ── Touch: long-press = flag, tap = reveal ──
+      var pressTimer = null;
+      var didLong    = false;
+
+      el.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        didLong = false;
+        pressTimer = setTimeout(function () {
+          didLong = true;
+          msFlag(idx);
+        }, 420);
+      });
+
+      el.addEventListener('pointerup', function (e) {
+        e.preventDefault();
+        clearTimeout(pressTimer);
+        if (didLong) return;
+        if (ms.flagMode) {
+          msFlag(idx);
+        } else if (cell.revealed && cell.adj > 0) {
+          msChord(idx);
+          msRenderGrid();
+          msUpdateHUD();
+        } else {
+          msReveal(idx);
+          msRenderGrid();
+          msUpdateHUD();
+        }
+      });
+
+      el.addEventListener('pointercancel', function () { clearTimeout(pressTimer); });
+
+      // Prevent context menu on long-press (mobile)
+      el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    }
+
+    return el;
   }
 
-  function botInSafeQueue(cell){
-    for(var i=0;i<_bot.safeQueue.length;i++) if(_bot.safeQueue[i].r===cell.r&&_bot.safeQueue[i].c===cell.c) return true;
-    return false;
-  }
-
-  function botPickGuess(g){
-    var cands=[];
-    for(var r=0;r<g.rows;r++) for(var c=0;c<g.cols;c++){
-      var d=g.cells[r][c];
-      if(!d.revealed&&!d.flagged&&!_bot.knownMines[r+','+c]) cands.push({r:r,c:c});
-    }
-    if(!cands.length) return null;
-    if(MS.botDiff==='easy') return cands[Math.floor(Math.random()*cands.length)];
-    if(MS.botDiff==='hard'){
-      var safe=cands.filter(function(cell){return !g.cells[cell.r][cell.c].mine;});
-      if(safe.length){
-        safe.forEach(function(cell){
-          var s=0,n=0;
-          forNeighbors(cell.r,cell.c,g.rows,g.cols,function(nr,nc){var nd=g.cells[nr][nc];if(nd.revealed&&!nd.mine&&nd.adj>0){s+=nd.adj;n++;}});
-          cell.danger=n>0?s/n:0;
-        });
-        safe.sort(function(a,b){return a.danger-b.danger;});
-        var pool=safe.slice(0,Math.max(1,Math.ceil(safe.length*0.2)));
-        return pool[Math.floor(Math.random()*pool.length)];
-      }
-      return null;
-    }
-    cands.forEach(function(cell){
-      var s=0,n=0,f=false;
-      forNeighbors(cell.r,cell.c,g.rows,g.cols,function(nr,nc){var nd=g.cells[nr][nc];if(nd.revealed&&!nd.mine&&nd.adj>0){s+=nd.adj;n++;f=true;}});
-      cell.frontier=f; cell.danger=n>0?s/n:0;
-    });
-    var interior=cands.filter(function(c){return !c.frontier;});
-    var pool2=interior.length>0?interior:cands;
-    return pool2[Math.floor(Math.random()*pool2.length)];
-  }
-
-  function shuffle(arr){for(var i=arr.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=arr[i];arr[i]=arr[j];arr[j]=t;}return arr;}
+  // ── Expose showAH-style navigation if needed ─────────
+  // (screen switching handled by dzShowScreen in main script)
 
 })();
