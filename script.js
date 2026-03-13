@@ -39,7 +39,6 @@ var screenPingPong     = document.getElementById('screen-pingpong');
 var screenMinesweeper  = document.getElementById('screen-minesweeper');
 var screenTetris       = document.getElementById('screen-tetris');
 var screenBomberman    = document.getElementById('screen-bomberman');
-var screenDrawGuess    = document.getElementById('screen-drawguess');
 var screenReaction     = document.getElementById('screen-reaction');
 var screenTerritory    = document.getElementById('screen-territory');
 // BUG 1 FIX: These screens were never added to ALL_SCREENS, so hideAllScreens()
@@ -72,7 +71,7 @@ function showHub() {
 
   // Show ad interstitial for 3 seconds, then navigate to hub
   var adOverlay    = document.getElementById('dz-ad-interstitial');
-  var countdown    = document.getElementById('dz-ad-interstitial-countdown');
+  var countdown    = document.getElementById('dz-ad-countdown');
   var _doShowHub   = function() {
     if (adOverlay) adOverlay.style.display = 'none';
     hideAllScreens();
@@ -139,7 +138,7 @@ function showC4() {
 function showCricket() {
   hideAllScreens();
   screenCricket.classList.remove('hidden');
-  cricketResetToSetup();
+  cricResetToSetup();
   window.scrollTo(0, 0);
 }
 
@@ -772,7 +771,6 @@ hubCards.forEach(function(card) {
 
   card.addEventListener('click', function(evt) {
     if (overlay.classList.contains('active')) return;
-    if (evt.target.closest('.card-setup-btn')) return;
     if (evt.target.closest('.card-save-btn'))  return;
 
     var gameName    = card.getAttribute('data-game');
@@ -783,6 +781,9 @@ hubCards.forEach(function(card) {
 
     // Track recently played
     if (game) dzTrackRecentGame(gameName, game.screen, accentColor);
+
+    // Show Hub & Setup in dropdown menu when in-game
+    if (game && window.dzSetInGame) window.dzSetInGame(game.screen);
 
     // Route to correct screen
     if (game && game.screen === 'ttt')        { showTTT();     return; }
@@ -936,7 +937,14 @@ function ttFindWin(mark){
   } return -1;
 }
 function tttBotEasy(){var e=tttEmpty();return e[Math.floor(Math.random()*e.length)];}
-function tttBotMed(){var w=ttFindWin('O');return w!==-1?w:tttBotEasy();}
+function tttBotMed(){
+  var w=ttFindWin('O'); if(w!==-1) return w;   // win if possible
+  var b=ttFindWin('X'); if(b!==-1) return b;   // block X from winning
+  // Prefer centre, then corners, then edges
+  var prio=[4,0,2,6,8,1,3,5,7];
+  for(var i=0;i<prio.length;i++){ if(tttBoard[prio[i]]==='') return prio[i]; }
+  return tttBotEasy();
+}
 function tttMinimax(isMax, depth, alpha, beta) {
   var oWin = tttWinLine('O') !== null;
   var xWin = tttWinLine('X') !== null;
@@ -944,11 +952,15 @@ function tttMinimax(isMax, depth, alpha, beta) {
   if (xWin) return depth - 10;
   var empty = tttEmpty();
   if (!empty.length) return 0;
+  // FIX: declare best/s/i once at function scope — avoids ES5 var-hoisting bug
+  // where 'var best = Infinity' in the else branch was silently a no-op,
+  // because hoisting merged both declarations into one (initialized to undefined).
+  var best, s, i;
   if (isMax) {
-    var best = -Infinity;
-    for (var i = 0; i < empty.length; i++) {
+    best = -Infinity;
+    for (i = 0; i < empty.length; i++) {
       tttBoard[empty[i]] = 'O';
-      var s = tttMinimax(false, depth + 1, alpha, beta);
+      s = tttMinimax(false, depth + 1, alpha, beta);
       tttBoard[empty[i]] = '';
       if (s > best) best = s;
       if (s > alpha) alpha = s;
@@ -956,10 +968,10 @@ function tttMinimax(isMax, depth, alpha, beta) {
     }
     return best;
   } else {
-    var best = Infinity;
-    for (var i = 0; i < empty.length; i++) {
+    best = Infinity;
+    for (i = 0; i < empty.length; i++) {
       tttBoard[empty[i]] = 'X';
-      var s = tttMinimax(true, depth + 1, alpha, beta);
+      s = tttMinimax(true, depth + 1, alpha, beta);
       tttBoard[empty[i]] = '';
       if (s < best) best = s;
       if (s < beta) beta = s;
@@ -1170,8 +1182,8 @@ function rpsRevealChoices(p1c, p2c) {
   } else if (winner === 'p2') {
     rpsScores.p2++;
     rpsScoreP2El.textContent = rpsScores.p2;
-    rpsResultEl.textContent = 'P2 WINS!';
-    rpsResultEl.className = 'lose';
+    rpsResultEl.textContent = (rpsMode === 'pve') ? 'BOT WINS!' : 'P2 WINS!';
+    rpsResultEl.className = 'p2win';
     rpsCardP2El.classList.add('active'); rpsCardP1El.classList.remove('active');
   } else {
     rpsResultEl.textContent = 'DRAW';
@@ -1255,6 +1267,9 @@ function rpsRestart() {
   rpsBtnsP1El.classList.remove('hidden');
   rpsBtnsP2El.classList.add('hidden');
   rpsPickPrompt.textContent = (rpsMode === 'pvp') ? 'Player 1 — Choose your weapon!' : 'Choose your weapon!';
+  // Hide in-game settings during active play
+  var rpsApp = document.getElementById('rps-app');
+  if (rpsApp) rpsApp.classList.add('rps-game-active');
 }
 
 function rpsSetMode(mode) {
@@ -1778,33 +1793,6 @@ function d2048DoMove(pIdx, dir, onDone) {
   return true;
 }
 
-function d2048HasMoves(pIdx) {
-  var occupied = {};
-  d2048Tiles[pIdx].forEach(function(t) { occupied[t.row + ',' + t.col] = true; });
-  for (var r = 0; r < 4; r++) {
-    for (var c = 0; c < 4; c++) {
-      if (!occupied[r + ',' + c]) return true;
-    }
-  }
-  // Check adjacent equal tiles
-  d2048Tiles[pIdx].forEach(function(t) {
-    if (!occupied) return; // shortcut
-    [[0,1],[0,-1],[1,0],[-1,0]].forEach(function(d) {
-      var nr = t.row + d[0], nc = t.col + d[1];
-      if (nr < 0 || nr > 3 || nc < 0 || nc > 3) return;
-      var neighbor = null;
-      for (var i = 0; i < d2048Tiles[pIdx].length; i++) {
-        if (d2048Tiles[pIdx][i].row === nr && d2048Tiles[pIdx][i].col === nc) {
-          neighbor = d2048Tiles[pIdx][i]; break;
-        }
-      }
-      if (neighbor && neighbor.value === t.value) occupied = null; // signal: has moves
-    });
-  });
-  return occupied === null; // if occupied got nulled, there are moves
-}
-
-// A cleaner hasMovesCheck since the above has a subtle bug:
 function d2048CanMove(pIdx) {
   var grid = [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]];
   d2048Tiles[pIdx].forEach(function(t) { grid[t.row][t.col] = t.value; });
@@ -2060,8 +2048,9 @@ function d2048StartSimBot() {
 
 // ── Init ────────────────────────────────────────────────────────
 function d2048Init() {
-  clearInterval(d2048BotTimer); d2048BotTimer = null;
+  clearInterval(d2048BotTimer);
   clearTimeout(d2048BotTimer);
+  d2048BotTimer = null;
 
   d2048Tiles      = [[], []];
   d2048Scores     = [0, 0];
@@ -3484,7 +3473,14 @@ function c4BotDrop(col) {
   if (!c4GameActive) return;
   if (col < 0 || col >= C4_COLS) return;
   var row = c4GetNextOpenRow(c4Board, col);
-  if (row === -1) { c4ResetGame(); return; }
+  if (row === -1) {
+    // Bot returned a full column — pick any valid column instead of resetting the whole game
+    var fallback = c4GetValidColumns(c4Board);
+    if (!fallback.length) { c4EndGame(null, null); return; }
+    col = fallback[Math.floor(Math.random() * fallback.length)];
+    row = c4GetNextOpenRow(c4Board, col);
+    if (row === -1) return; // should never happen
+  }
   c4Board[row][col] = c4CurrentPlayer;
   c4RenderCell(row, col, c4CurrentPlayer, true);
   SoundManager.c4Drop();
@@ -4826,6 +4822,7 @@ function pbSubmitGuess() {
   document.getElementById('pb-attempts-val').textContent = pb.attempts;
 
   var feedback = pbGetFeedback(guess, pb.secret);
+  pb.guessHistory.push({ guess: guess, feedback: feedback });
   pbRenderRow(guess, feedback, pb.attempts);
 
   // Play sounds based on feedback
@@ -6573,8 +6570,8 @@ var GlobalBotEngine = (function() {
     gameId:      'cricket',
     containerId: 'screen-cricket',
     init:   function() {},
-    start:  function() { cricketResetToSetup(); },
-    reset:  function() { cricketResetToSetup(); },
+    start:  function() { cricResetToSetup(); },
+    reset:  function() { cricResetToSetup(); },
     destroy: function() {
       cricNumpadLocked = true;
     }
@@ -6803,7 +6800,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     difficulty:     'easy',
     gameOver:       false,
     botThinking:    false,
-    gridSize:       3,      // 3=3x3 boxes (4x4 dots), 5=5x5 boxes, 10=10x10 boxes
     totalLines:     24,
     drawnLines:     0
   };
@@ -6891,19 +6887,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   });
 
   // Start game
-  // Grid Size buttons (3x3, 5x5, 10x10)
-  var cddGridBtns = document.querySelectorAll('.cdd-grid-size-btn');
-  if (cddGridBtns.length) {
-    cddGridBtns.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        cddGridBtns.forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        cdd.gridSize = parseInt(btn.dataset.gridsize, 10) || 3;
-        SoundManager.click();
-      });
-    });
-  }
-
   if (cddHpStart) {
     cddHpStart.addEventListener('click', function() {
       SoundManager.click();
@@ -7007,27 +6990,24 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   // ── Data Structures ─────────────────────────────────────────
 
   function cddBuildData() {
-    var G = cdd.gridSize; // number of boxes per side
-    // Horizontal lines: h-{row}-{col}, row=0..G, col=0..G-1
-    for (var r = 0; r <= G; r++) {
-      for (var c = 0; c <= G-1; c++) {
+    // Horizontal lines: h-{row}-{col}, row=0..3, col=0..2
+    for (var r = 0; r <= 3; r++) {
+      for (var c = 0; c <= 2; c++) {
         var hid = 'h-' + r + '-' + c;
         cdd.lines[hid] = {id: hid, type: 'h', row: r, col: c, isDrawn: false, owner: null};
       }
     }
-    // Vertical lines: v-{row}-{col}, row=0..G-1, col=0..G
-    for (var r = 0; r <= G-1; r++) {
-      for (var c = 0; c <= G; c++) {
+    // Vertical lines: v-{row}-{col}, row=0..2, col=0..3
+    for (var r = 0; r <= 2; r++) {
+      for (var c = 0; c <= 3; c++) {
         var vid = 'v-' + r + '-' + c;
         cdd.lines[vid] = {id: vid, type: 'v', row: r, col: c, isDrawn: false, owner: null};
       }
     }
-    // Update totalLines
-    cdd.totalLines = (G+1)*G + G*(G+1); // H lines + V lines
 
-    // Boxes: box-{row}-{col}, row=0..G-1, col=0..G-1
-    for (var r = 0; r <= G-1; r++) {
-      for (var c = 0; c <= G-1; c++) {
+    // Boxes: box-{row}-{col}, row=0..2, col=0..2
+    for (var r = 0; r <= 2; r++) {
+      for (var c = 0; c <= 2; c++) {
         var bid = 'box-' + r + '-' + c;
         cdd.boxes[bid] = {
           id: bid, row: r, col: c,
@@ -7059,36 +7039,11 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   function cddRenderGrid() {
     if (!cddGrid) return;
     cddGrid.innerHTML = '';
+    // Grid: 7×7 using 18px dots + 64px line cells = 4×18 + 3×64 = 264px square
     cddGrid.classList.remove('locked');
-    var G = cdd.gridSize;
-    var totalCells = (G * 2 + 1); // dots + lines alternating
 
-    // ── Compute sizes that always fit the screen ──────────────
-    // DOT: fixed small size for the dot rows/columns
-    var DOT = 12;
-    // Available width: viewport minus container side padding (2×16px),
-    // capped at the #cdd-app max-width of 520px
-    var availW = Math.min(window.innerWidth - 32, 520);
-    // CELL fills remaining space evenly; clamp to sensible range
-    var CELL = Math.floor((availW - (G + 1) * DOT) / G);
-    if (G <= 3) CELL = Math.min(CELL, 92);   // don't get absurdly large on desktop
-    if (G <= 5) CELL = Math.min(CELL, 74);
-    CELL = Math.max(CELL, 28);               // minimum touch-friendly size
-    // Expose sizes as CSS custom properties so CSS rules can read them
-    cddGrid.style.setProperty('--cdd-dot-sz',  DOT  + 'px');
-    cddGrid.style.setProperty('--cdd-cell-sz', CELL + 'px');
-
-    // Build alternating column/row template: DOT CELL DOT CELL ... DOT
-    var trackList = [];
-    for (var t = 0; t < totalCells; t++) {
-      trackList.push(t % 2 === 0 ? DOT + 'px' : CELL + 'px');
-    }
-    var tpl = trackList.join(' ');
-    cddGrid.style.gridTemplateColumns = tpl;
-    cddGrid.style.gridTemplateRows    = tpl;
-
-    for (var vi = 0; vi < totalCells; vi++) {
-      for (var vj = 0; vj < totalCells; vj++) {
+    for (var vi = 0; vi <= 6; vi++) {
+      for (var vj = 0; vj <= 6; vj++) {
         var el;
         var ri = vi % 2, rj = vj % 2; // 0=even, 1=odd
 
@@ -7143,16 +7098,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   }
 
   function cddSetLineClickHandler(el, lid) {
-    // touchend fires before click — handle it and flag so click doesn't double-fire
-    var _touchFired = false;
-    el.addEventListener('touchend', function(e) {
-      e.preventDefault(); // prevent synthesised mouse click
-      _touchFired = true;
-      cddOnLineClick(lid);
-      setTimeout(function() { _touchFired = false; }, 500);
-    }, { passive: false });
     el.addEventListener('click', function() {
-      if (_touchFired) return; // already handled by touchend
       cddOnLineClick(lid);
     });
     el.addEventListener('keydown', function(e) {

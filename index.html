@@ -274,6 +274,50 @@
   <!-- Dropdown backdrop -->
   <div id="dz-menu-backdrop" onclick="dzCloseMenu()"></div>
 
+  <!-- ══ IN-GAME Menu (shown only when inside a game) ══ -->
+  <div id="dz-ingame-dropdown" class="dz-ingame-dropdown" aria-hidden="true">
+    <!-- Header -->
+    <div class="igd-header">
+      <div class="igd-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17,2 12,7 7,2"/></svg>
+      </div>
+      <span class="igd-title">GAME MENU</span>
+      <button class="igd-close-x" onclick="dzCloseIngameMenu()" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Hub button -->
+    <button class="igd-item" onclick="dzNavShowHome(); dzCloseIngameMenu();">
+      <span class="igd-item-icon igd-cyan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </span>
+      <span class="igd-item-label">← Hub</span>
+      <span class="igd-item-arrow">›</span>
+    </button>
+
+    <!-- Setup button -->
+    <button class="igd-item" id="igd-setup-btn" onclick="dzIngameSetup();">
+      <span class="igd-item-icon igd-violet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </span>
+      <span class="igd-item-label">⚙ Setup</span>
+      <span class="igd-item-arrow">›</span>
+    </button>
+
+    <!-- Sound toggle -->
+    <button class="igd-item" id="igd-sound-btn" onclick="dzIngameToggleSound();">
+      <span class="igd-item-icon igd-green" id="igd-sound-icon-wrap">
+        <svg id="igd-sound-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path id="igd-sound-waves" d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/>
+        </svg>
+      </span>
+      <span class="igd-item-label" id="igd-sound-label">Sound: On</span>
+      <span class="igd-sound-toggle" id="igd-sound-toggle">ON</span>
+    </button>
+  </div>
+
   <!-- Saved Games Panel -->
   <div id="dz-saved-panel" class="dz-side-panel">
     <div class="panel-header">
@@ -2789,14 +2833,6 @@
               <button class="diff-btn" id="cdd-hp-extreme">Extreme</button>
             </div>
           </div>
-          <div class="ghp-setting-row">
-            <span class="diff-label-text">GRID SIZE</span>
-            <div class="diff-btn-group">
-              <button class="diff-btn cdd-grid-size-btn active" data-gridsize="3">3×3</button>
-              <button class="diff-btn cdd-grid-size-btn" data-gridsize="5">5×5</button>
-              <button class="diff-btn cdd-grid-size-btn" data-gridsize="7">7×7</button>
-            </div>
-          </div>
         </div>
         <button class="ghp-start-btn" id="cdd-hp-start" style="--ghp-accent:#ff9100">▶ START GAME</button>
       </div>
@@ -2804,16 +2840,13 @@
 
     <!-- PLAY PANEL -->
     <div id="cdd-play" class="hidden cdd-play-wrap">
-      <div class="dz-topbar">
-        <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
-        <button class="ghp-back-game" id="cdd-back-to-home">⚙ Setup</button>
-      </div>
+      <button class="ghp-back-game" id="cdd-back-to-home">← Setup</button>
 
       <div id="cdd-app">
 
         <!-- Header -->
         <div id="cdd-header">
-          <h2 id="cdd-title">Connect Dots</h2>
+          <h2 id="cdd-title">Connect Dots Duel</h2>
           <p id="cdd-mode-label">PvP</p>
         </div>
 
@@ -2860,6 +2893,7 @@
         <!-- Controls -->
         <div id="cdd-controls">
           <button id="cdd-reset-btn">↺ Reset</button>
+          <button id="cdd-hub-btn">← Hub</button>
         </div>
 
       </div><!-- /#cdd-app -->
@@ -3549,7 +3583,7 @@
     <!-- Tetris back-play: hidden dummy kept for JS/script.js compat -->
     <button id="tetris-back-play" style="display:none;" aria-hidden="true"></button>
 
-    <div id="tetris-play" class="hidden" style="position:fixed;inset:0;background:#07080f;overflow-y:auto;padding:0 12px 16px;font-family:'Rajdhani',sans-serif;box-sizing:border-box;z-index:50;">
+    <div id="tetris-play" class="hidden" style="position:fixed;inset:0;background:#07080f;overflow:hidden;padding:0 12px 16px;font-family:'Rajdhani',sans-serif;box-sizing:border-box;z-index:50;">
       <div class="dz-topbar">
         <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
         <button class="ghp-back-game" onclick="document.getElementById('tetris-play').classList.add('hidden');document.getElementById('tetris-home').style.display='';if(window.tetrisStop)window.tetrisStop();">⚙ Setup</button>
@@ -3644,7 +3678,7 @@
     <!-- Reaction back-play: hidden dummy kept for JS/script.js compat -->
     <button id="rd-back-play" style="display:none;" aria-hidden="true"></button>
 
-    <div id="rd-play" class="hidden" style="position:fixed;inset:0;background:#07080f;overflow-y:auto;padding:0 16px 16px;font-family:'Rajdhani',sans-serif;display:flex;flex-direction:column;align-items:center;box-sizing:border-box;z-index:50;">
+    <div id="rd-play" class="hidden" style="position:fixed;inset:0;background:#07080f;overflow:hidden;padding:0 16px 16px;font-family:'Rajdhani',sans-serif;display:flex;flex-direction:column;align-items:center;box-sizing:border-box;z-index:50;">
       <div class="dz-topbar" style="width:100%;align-self:stretch;">
         <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
         <button class="ghp-back-game" onclick="document.getElementById('rd-play').classList.add('hidden');document.getElementById('rd-home').style.display='';if(window.reactionStop)window.reactionStop();if(window.rdStop)window.rdStop();">⚙ Setup</button>
@@ -3862,7 +3896,7 @@
         <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
         <button class="ghp-back-game" onclick="var b=document.getElementById('ludo-back-play');if(b)b.click();">⚙ Setup</button>
       </div>
-      <div id="ludo-app" style="flex:1;min-height:0;width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;overflow-y:auto;padding:4px 10px 16px;box-sizing:border-box;"></div>
+      <div id="ludo-app" style="flex:1;min-height:0;width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;overflow:hidden;padding:4px 10px 16px;box-sizing:border-box;"></div>
 
       <!-- Result overlay -->
       <div id="ludo-result" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);z-index:99;animation:ldResIn 0.35s cubic-bezier(.34,1.56,.64,1);">
@@ -4033,7 +4067,7 @@
     <button id="sdk-back-play" style="display:none;" aria-hidden="true"></button>
 
     <!-- Play Panel -->
-    <div id="sdk-play" class="hidden" style="position:fixed;inset:0;background:#07080f;display:flex;flex-direction:column;align-items:center;overflow-y:auto;box-sizing:border-box;z-index:50;">
+    <div id="sdk-play" class="hidden" style="position:fixed;inset:0;background:#07080f;display:flex;flex-direction:column;align-items:center;overflow:hidden;box-sizing:border-box;z-index:50;">
       <div class="dz-topbar">
         <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
         <button class="ghp-back-game" onclick="document.getElementById('sdk-play').classList.add('hidden');document.getElementById('sdk-home').style.display='';if(window.sudokuStop)window.sudokuStop();">⚙ Setup</button>
@@ -4892,5 +4926,178 @@ if (document.readyState === 'loading') {
   })();
   </script>
 
+  <!-- ══════════════════════════════════════════════
+       IN-GAME MENU CONTROLLER
+       ══════════════════════════════════════════════ -->
+  <script>
+  /* ══════════════════════════════════════════════
+     IN-GAME MENU CONTROLLER
+     ══════════════════════════════════════════════ */
+  (function() {
+    'use strict';
+
+    var _igOpen = false;
+
+    /* ── Is the user inside a game (hub hidden)? ── */
+    function _inGame() {
+      var hub = document.getElementById('screen-hub');
+      return !!(hub && hub.classList.contains('hidden'));
+    }
+
+    /* ── Open / close in-game dropdown ── */
+    function _openIGMenu() {
+      _igOpen = true;
+      _syncSoundUI();
+      var drop = document.getElementById('dz-ingame-dropdown');
+      var bk   = document.getElementById('dz-ingame-backdrop');
+      if (drop) { drop.classList.add('open'); drop.setAttribute('aria-hidden', 'false'); }
+      if (bk)   bk.classList.add('active');
+      /* close main menu if somehow open */
+      var mainDrop = document.getElementById('dz-dropdown');
+      var mainBtn  = document.getElementById('dz-hamburger');
+      var mainBk   = document.getElementById('dz-menu-backdrop');
+      if (mainDrop) { mainDrop.classList.remove('open'); mainDrop.setAttribute('aria-hidden','true'); }
+      if (mainBtn)  { mainBtn.classList.remove('open'); mainBtn.setAttribute('aria-expanded','false'); }
+      if (mainBk)   mainBk.classList.remove('active');
+    }
+
+    window.dzCloseIngameMenu = function() {
+      _igOpen = false;
+      var drop = document.getElementById('dz-ingame-dropdown');
+      var bk   = document.getElementById('dz-ingame-backdrop');
+      if (drop) { drop.classList.remove('open'); drop.setAttribute('aria-hidden', 'true'); }
+      if (bk)   bk.classList.remove('active');
+    };
+
+    /* ── Route hamburger click ── */
+    function _handleHamburgerClick() {
+      if (_inGame()) {
+        _igOpen ? window.dzCloseIngameMenu() : _openIGMenu();
+      } else {
+        /* use the main menu open/close */
+        window.dzCloseIngameMenu();
+        var mainDrop = document.getElementById('dz-dropdown');
+        var mainBtn  = document.getElementById('dz-hamburger');
+        var mainBk   = document.getElementById('dz-menu-backdrop');
+        if (!mainDrop) return;
+        var isOpen = mainDrop.classList.contains('open');
+        if (isOpen) {
+          mainDrop.classList.remove('open'); mainDrop.setAttribute('aria-hidden','true');
+          if (mainBtn) { mainBtn.classList.remove('open'); mainBtn.setAttribute('aria-expanded','false'); }
+          if (mainBk)  mainBk.classList.remove('active');
+        } else {
+          mainDrop.classList.add('open'); mainDrop.setAttribute('aria-hidden','false');
+          if (mainBtn) { mainBtn.classList.add('open'); mainBtn.setAttribute('aria-expanded','true'); }
+          if (mainBk)  mainBk.classList.add('active');
+        }
+      }
+    }
+
+    /* Attach on DOMContentLoaded so the button exists */
+    function _init() {
+      var ham = document.getElementById('dz-hamburger');
+      if (ham) {
+        /* Remove old inline onclick then use addEventListener */
+        ham.removeAttribute('onclick');
+        ham.addEventListener('click', function(e) {
+          e.stopPropagation();
+          _handleHamburgerClick();
+        });
+      }
+
+      /* Backdrop for in-game menu */
+      var bk = document.createElement('div');
+      bk.id = 'dz-ingame-backdrop';
+      bk.style.cssText = 'position:fixed;inset:0;z-index:1089;display:none;';
+      bk.addEventListener('click', function() { window.dzCloseIngameMenu(); });
+      document.body.appendChild(bk);
+      var st = document.createElement('style');
+      st.textContent = '#dz-ingame-backdrop.active{display:block;}';
+      document.head.appendChild(st);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _init);
+    } else {
+      _init();
+    }
+
+    /* ── Sound sync ── */
+    function _syncSoundUI() {
+      /* Read muted state the same way dzToggleMusicFromMenu does */
+      var MUTED_KEY = 'dz_muted';
+      var muted = localStorage.getItem(MUTED_KEY) === '1';
+      var label = document.getElementById('igd-sound-label');
+      var tog   = document.getElementById('igd-sound-toggle');
+      var waves = document.getElementById('igd-sound-waves');
+      if (label) label.textContent = muted ? 'Sound: Off' : 'Sound: On';
+      if (tog)   { tog.textContent = muted ? 'OFF' : 'ON'; tog.classList.toggle('off', muted); }
+      if (waves) waves.setAttribute('d', muted ? '' : 'M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07');
+    }
+
+    window.dzIngameToggleSound = function() {
+      /* Delegate entirely to the main menu sound toggle — same logic, same storage */
+      if (window.dzToggleMusicFromMenu) {
+        window.dzToggleMusicFromMenu();
+      }
+      /* Sync in-game UI to match the new state */
+      _syncSoundUI();
+    };
+
+    /* ── Setup ── */
+    window.dzIngameSetup = function() {
+      window.dzCloseIngameMenu();
+      /* Find the active game's setup button and click it */
+      var screen = null;
+      document.querySelectorAll('[id^="screen-"]').forEach(function(s) {
+        if (s.id !== 'screen-hub' && !s.classList.contains('hidden')) screen = s;
+      });
+      var btn = null;
+      if (screen) btn = screen.querySelector('.ghp-back-game');
+      /* Fixed-position play panels (Tetris, Reaction, Ludo, Carrom, Sudoku) */
+      if (!btn) {
+        ['tetris-play','rd-play','ludo-play','carrom-play','sdk-play'].forEach(function(id) {
+          if (btn) return;
+          var el = document.getElementById(id);
+          if (el && !el.classList.contains('hidden')) btn = el.querySelector('.ghp-back-game');
+        });
+      }
+      if (btn) btn.click();
+    };
+
+    /* ── Escape key ── */
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && _igOpen) window.dzCloseIngameMenu();
+    });
+
+  })();
+  </script>
+
+<script>
+// Patch: re-render CDD grid after layout so clientHeight is real
+(function() {
+  var _orig;
+  function patchCdd() {
+    if (typeof cddRenderGrid === 'function' && !cddRenderGrid._patched) {
+      _orig = cddRenderGrid;
+      window.cddRenderGrid = function() {
+        _orig();
+        // Re-run after two animation frames to get real clientHeight
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            var wrap = document.getElementById('cdd-grid-wrap');
+            if (wrap && wrap.clientHeight > 0) _orig();
+          });
+        });
+      };
+      window.cddRenderGrid._patched = true;
+    }
+  }
+  // Try after DOMContentLoaded and after a short delay for script.js to load
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(patchCdd, 100);
+  });
+})();
+</script>
 </body>
 </html>

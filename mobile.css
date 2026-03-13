@@ -168,9 +168,7 @@
   align-items: stretch;
   justify-content: flex-start;
   width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   position: relative;
   min-height: 0;
 }
@@ -320,8 +318,8 @@
   .hamburger-btn {
     position: fixed !important;
     top: 14px !important;
-    right: 14px !important;
-    left: auto !important;
+    left: 14px !important;
+    right: auto !important;
     z-index: 9999 !important;
     display: flex !important;
     visibility: visible !important;
@@ -467,7 +465,8 @@
     max-width: 100%;
     box-sizing: border-box;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     /* Use dynamic viewport height for correct calc on notch phones */
     max-height: 100dvh;
     /* Fallback for browsers without dvh */
@@ -1087,7 +1086,8 @@
     #dz-hamburger,
     .hamburger-btn {
       top: calc(14px + env(safe-area-inset-top)) !important;
-      right: calc(14px + env(safe-area-inset-right)) !important;
+      left: calc(14px + env(safe-area-inset-left)) !important;
+      right: auto !important;
     }
 
     /* Hub screen bottom padding accounts for home indicator */
