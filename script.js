@@ -6800,6 +6800,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     difficulty:     'easy',
     gameOver:       false,
     botThinking:    false,
+    gridSize:       3,      // 3=3x3 boxes (4x4 dots), 5=5x5 boxes, 10=10x10 boxes
     totalLines:     24,
     drawnLines:     0
   };
@@ -6887,6 +6888,19 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   });
 
   // Start game
+  // Grid Size buttons (3x3, 5x5, 10x10)
+  var cddGridBtns = document.querySelectorAll('.cdd-grid-size-btn');
+  if (cddGridBtns.length) {
+    cddGridBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        cddGridBtns.forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        cdd.gridSize = parseInt(btn.dataset.gridsize, 10) || 3;
+        SoundManager.click();
+      });
+    });
+  }
+
   if (cddHpStart) {
     cddHpStart.addEventListener('click', function() {
       SoundManager.click();
@@ -6972,7 +6986,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     // Show play panel
     cddHomePanel.classList.add('hidden');
     cddPlayPanel.classList.remove('hidden');
-    cddResult.classList.add('hidden');
+    if (cddResult) cddResult.classList.add('hidden');
 
     window.scrollTo(0, 0);
   }
@@ -6990,24 +7004,27 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   // ── Data Structures ─────────────────────────────────────────
 
   function cddBuildData() {
-    // Horizontal lines: h-{row}-{col}, row=0..3, col=0..2
-    for (var r = 0; r <= 3; r++) {
-      for (var c = 0; c <= 2; c++) {
+    var G = cdd.gridSize; // number of boxes per side
+    // Horizontal lines: h-{row}-{col}, row=0..G, col=0..G-1
+    for (var r = 0; r <= G; r++) {
+      for (var c = 0; c <= G-1; c++) {
         var hid = 'h-' + r + '-' + c;
         cdd.lines[hid] = {id: hid, type: 'h', row: r, col: c, isDrawn: false, owner: null};
       }
     }
-    // Vertical lines: v-{row}-{col}, row=0..2, col=0..3
-    for (var r = 0; r <= 2; r++) {
-      for (var c = 0; c <= 3; c++) {
+    // Vertical lines: v-{row}-{col}, row=0..G-1, col=0..G
+    for (var r = 0; r <= G-1; r++) {
+      for (var c = 0; c <= G; c++) {
         var vid = 'v-' + r + '-' + c;
         cdd.lines[vid] = {id: vid, type: 'v', row: r, col: c, isDrawn: false, owner: null};
       }
     }
+    // Update totalLines
+    cdd.totalLines = (G+1)*G + G*(G+1); // H lines + V lines
 
-    // Boxes: box-{row}-{col}, row=0..2, col=0..2
-    for (var r = 0; r <= 2; r++) {
-      for (var c = 0; c <= 2; c++) {
+    // Boxes: box-{row}-{col}, row=0..G-1, col=0..G-1
+    for (var r = 0; r <= G-1; r++) {
+      for (var c = 0; c <= G-1; c++) {
         var bid = 'box-' + r + '-' + c;
         cdd.boxes[bid] = {
           id: bid, row: r, col: c,
@@ -7039,11 +7056,46 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   function cddRenderGrid() {
     if (!cddGrid) return;
     cddGrid.innerHTML = '';
-    // Grid: 7×7 using 18px dots + 64px line cells = 4×18 + 3×64 = 264px square
     cddGrid.classList.remove('locked');
+    var G = cdd.gridSize;
+    var totalCells = (G * 2 + 1); // dots + lines alternating
 
-    for (var vi = 0; vi <= 6; vi++) {
-      for (var vj = 0; vj <= 6; vj++) {
+    // ── Compute sizes that always fit the screen ──────────────
+    // DOT: fixed small size for the dot rows/columns
+    var DOT = 12;
+    // Available width: container width minus padding (2×8px), capped at max-width
+    var availW = Math.min((cddGrid.parentElement ? cddGrid.parentElement.clientWidth - 16 : window.innerWidth - 32), 516);
+    // Available height: grid-wrap height minus padding
+    var wrapEl = document.getElementById('cdd-grid-wrap');
+    var availH = (wrapEl && wrapEl.clientHeight > 0) ? wrapEl.clientHeight - 16 : window.innerHeight - 180;
+    // If layout hasn't happened yet, re-render after two animation frames
+    if (!wrapEl || wrapEl.clientHeight === 0) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() { cddRenderGrid(); });
+      });
+    }
+    // CELL: fit both width and height
+    var CELL_W = Math.floor((availW - (G + 1) * DOT) / G);
+    var CELL_H = Math.floor((availH - (G + 1) * DOT) / G);
+    var CELL = Math.min(CELL_W, CELL_H);
+    if (G <= 3) CELL = Math.min(CELL, 88);
+    if (G <= 5) CELL = Math.min(CELL, 68);
+    CELL = Math.max(CELL, 24);
+    // Expose sizes as CSS custom properties so CSS rules can read them
+    cddGrid.style.setProperty('--cdd-dot-sz',  DOT  + 'px');
+    cddGrid.style.setProperty('--cdd-cell-sz', CELL + 'px');
+
+    // Build alternating column/row template: DOT CELL DOT CELL ... DOT
+    var trackList = [];
+    for (var t = 0; t < totalCells; t++) {
+      trackList.push(t % 2 === 0 ? DOT + 'px' : CELL + 'px');
+    }
+    var tpl = trackList.join(' ');
+    cddGrid.style.gridTemplateColumns = tpl;
+    cddGrid.style.gridTemplateRows    = tpl;
+
+    for (var vi = 0; vi < totalCells; vi++) {
+      for (var vj = 0; vj < totalCells; vj++) {
         var el;
         var ri = vi % 2, rj = vj % 2; // 0=even, 1=odd
 
@@ -7088,7 +7140,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
           el.setAttribute('data-boxid', bid);
           var lbl = document.createElement('span');
           lbl.className = 'cdd-box-label';
-          lbl.textContent = 'P1';
+          lbl.textContent = '';
           el.appendChild(lbl);
         }
 
@@ -7098,7 +7150,16 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   }
 
   function cddSetLineClickHandler(el, lid) {
+    // touchend fires before click — handle it and flag so click doesn't double-fire
+    var _touchFired = false;
+    el.addEventListener('touchend', function(e) {
+      e.preventDefault(); // prevent synthesised mouse click
+      _touchFired = true;
+      cddOnLineClick(lid);
+      setTimeout(function() { _touchFired = false; }, 500);
+    }, { passive: false });
     el.addEventListener('click', function() {
+      if (_touchFired) return; // already handled by touchend
       cddOnLineClick(lid);
     });
     el.addEventListener('keydown', function(e) {
@@ -7143,8 +7204,15 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     // Check box completion
     var boxesClaimed = cddCheckBoxes(player);
 
+    // ── Check game over FIRST, before any turn-switch or bot schedule ──
+    if (cdd.drawnLines >= cdd.totalLines) {
+      if (boxesClaimed > 0) cddUpdateScores(); // commit final box claims to display
+      cddEndGame();
+      return;
+    }
+
     if (boxesClaimed > 0) {
-      // Player keeps turn
+      // Player keeps turn (claimed at least one box)
       cddUpdateScores();
       if (cdd.gameOver) return;
       SoundManager.gameStart(); // box completion sound
@@ -7157,11 +7225,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
       // Switch turn
       cddSwitchTurn();
       SoundManager.tttMove(); // line draw / turn switch sound
-    }
-
-    // Check game over
-    if (cdd.drawnLines >= cdd.totalLines) {
-      cddEndGame();
     }
   }
 
@@ -7296,8 +7359,8 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     cdd.botThinking = true;
     cddGrid && cddGrid.classList.add('locked');
 
-    cddTurnIndicator.className = 'cdd-turn-thinking';
-    cddTurnText.textContent = 'Bot is thinking…';
+    if (cddTurnIndicator) cddTurnIndicator.className = 'cdd-turn-thinking';
+    if (cddTurnText) cddTurnText.textContent = 'Bot is thinking…';
 
     var delay = 600 + Math.random() * 300; // 600–900 ms
     cdd._botTimeout = setTimeout(function() {
@@ -7352,7 +7415,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
 
   // ── Register GlobalBotEngine strategy ────────────────────────
 
-  GlobalBotEngine._strategies['connectdots'] = function(difficulty, state, mem) {
+  GlobalBotEngine.registerStrategy('connectdots', function(difficulty, state, mem) {
     var available = state.availableLines;
     if (!available || !available.length) return null;
 
@@ -7453,7 +7516,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     });
 
     return bestLine || available[Math.floor(Math.random() * available.length)];
-  };
+  });
 
   // ── GameLoader Registration ───────────────────────────────────
 
@@ -7462,6 +7525,27 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     containerId: 'screen-connectdots',
     init: function() {
       // All wiring is done at parse time above
+      // Re-render grid on resize/orientation change
+      window.addEventListener('resize', function() {
+        if (!cdd.gameOver && document.getElementById('cdd-play') && !document.getElementById('cdd-play').classList.contains('hidden')) {
+          cddRenderGrid();
+          // Restore drawn lines and completed boxes visually
+          Object.keys(cdd.lines).forEach(function(lid) {
+            var ln = cdd.lines[lid];
+            if (!ln.isDrawn) return;
+            var el = cddGrid && cddGrid.querySelector('[data-lineid="' + lid + '"]');
+            if (el) {
+              el.classList.add('drawn');
+              el.classList.add(ln.owner === 'p1' ? 'drawn-p1' : 'drawn-p2');
+            }
+          });
+          Object.keys(cdd.boxes).forEach(function(bid) {
+            var box = cdd.boxes[bid];
+            if (!box.isCompleted) return;
+            cddAnimateBox(bid, box.owner);
+          });
+        }
+      });
     },
     start: function() {
       // Show home/setup panel
