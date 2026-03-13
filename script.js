@@ -56,6 +56,9 @@ function hideAllScreens() {
 }
 
 function showHub() {
+  // Stop any running game loops so they don't bleed through in the background
+  ahStopLoop();
+
   // Hide all fixed play panels and back buttons (position:fixed elements escape parent hide)
   ['mine-play','tetris-play','bm-play','rd-play',
    'tw-play','sdk-play','carrom-play','ludo-play'].forEach(function(id) {
@@ -69,9 +72,9 @@ function showHub() {
   document.body.style.overflow = '';
   document.body.style.overscrollBehavior = '';
 
-  // Show ad interstitial for 3 seconds, then navigate to hub
+  // Show ad interstitial for 5 seconds, then navigate to hub
   var adOverlay    = document.getElementById('dz-ad-interstitial');
-  var countdown    = document.getElementById('dz-ad-countdown');
+  var countdown    = document.getElementById('dz-ad-interstitial-countdown');
   var _doShowHub   = function() {
     if (adOverlay) adOverlay.style.display = 'none';
     hideAllScreens();
@@ -83,8 +86,8 @@ function showHub() {
   };
   if (adOverlay) {
     adOverlay.style.display = 'flex';
-    if (countdown) countdown.textContent = '3';
-    var _secs = 3;
+    if (countdown) countdown.textContent = '5';
+    var _secs = 5;
     var _tick = setInterval(function() {
       _secs--;
       if (countdown) countdown.textContent = _secs;
@@ -7786,6 +7789,7 @@ function dzNavShowHome() {
   dzClosePanels();
 
   // ── Stop every game that could be running in the background ──
+  ahStopLoop();
   if (typeof window.mineDestroy      === 'function') window.mineDestroy();
   if (typeof window.tetrisDestroy    === 'function') window.tetrisDestroy();
   if (typeof window.bombermanDestroy === 'function') window.bombermanDestroy();
