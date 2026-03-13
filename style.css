@@ -6832,6 +6832,7 @@ html, body {
 
 #screen-checkers {
   min-height: 100vh;
+  background: #07080f;
   color: var(--text, #e2e8ff);
   font-family: 'Rajdhani', sans-serif;
   padding: 1rem 0.5rem 3rem;
@@ -13928,6 +13929,81 @@ canvas {
    DZ: Territory Wars & Space Dodge — Landscape-first game layout
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── Portrait-rotate warning overlay ─────────────────────────────────────
+   Hidden by default; shown via JS (warn.style.display='flex') or via the
+   body.dz-game-landscape-required class. Full-screen, above everything.   */
+#dz-portrait-warn {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(4, 6, 18, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 32px 24px;
+  font-family: 'Rajdhani', sans-serif;
+  color: #e8eaf0;
+}
+
+#dz-portrait-warn .pw-icon {
+  font-size: 3rem;
+  line-height: 1;
+  animation: dz-pw-spin 2s ease-in-out infinite alternate;
+}
+
+@keyframes dz-pw-spin {
+  from { transform: rotate(-15deg); }
+  to   { transform: rotate(15deg); }
+}
+
+#dz-portrait-warn .pw-accent-line {
+  width: 48px;
+  height: 3px;
+  background: linear-gradient(90deg, #00e5ff, #ff6d00);
+  border-radius: 2px;
+}
+
+#dz-portrait-warn .pw-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1rem, 4vw, 1.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+
+#dz-portrait-warn .pw-sub {
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.55);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+#dz-portrait-warn .pw-skip {
+  margin-top: 4px;
+  padding: 10px 24px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  color: rgba(255,255,255,0.7);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+#dz-portrait-warn .pw-skip:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+
 /*
  * Portrait warning should appear for Territory and Space Dodge
  * the same way it does for Tanks. The JS (dzGamePortraitCheck)
@@ -13941,6 +14017,18 @@ body.dz-game-landscape-required #dz-portrait-warn {
 
 
 
+
+
+/* ── UNIVERSAL GAME SCREEN BACKGROUND FIX ────────────────────────────────
+   Hub atmospheric layers (.bg-fog, .bg-scanlines, .bg-grid) are position:fixed
+   at z-index 0–1. Game screens use z-index:10 but many have no background
+   set, making them transparent — the fixed layers bleed through as a visible
+   overlay on every game. This single rule ensures every screen-* element is
+   opaque by default. Screens that already declare their own background are
+   unaffected (var(--bg) = #07080f matches the global dark theme).            */
+[id^="screen-"]:not(.hidden):not(#screen-hub) {
+  background: var(--bg, #07080f);
+}
 
 
 /* ── GLOBAL BACK BUTTON SIZE FIX ──────────────────────────────────────────

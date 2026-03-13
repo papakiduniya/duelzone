@@ -80,6 +80,11 @@ function showHub() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+    // BUG 6 FIX: showHub() never called dzShowScreen's patched wrapper,
+    // so the orientation dismiss-reset + re-check never fired on back-to-hub.
+    setTimeout(function() {
+      if (window.dzCheckOrientation) window.dzCheckOrientation();
+    }, 80);
   };
   if (adOverlay) {
     adOverlay.style.display = 'flex';
@@ -187,7 +192,19 @@ function showBattleship() {
 function showCheckers() {
   hideAllScreens();
   screenCheckers.classList.remove('hidden');
-  if (typeof ckInit === 'function') { ckInit(); }
+  if (typeof ckInit === 'function') {
+    ckInit();
+  } else {
+    // BUG 5 FIX: ckInit lives in checkers.js — if it hasn't loaded yet,
+    // manually reset all overlay panels to a clean initial state so the
+    // mode-selection screen appears instead of a blank/broken board.
+    var ckMode   = document.getElementById('ck-mode-panel');
+    var ckDiff   = document.getElementById('ck-diff-panel');
+    var ckResult = document.getElementById('ck-result-panel');
+    if (ckMode)   ckMode.classList.remove('ck-hidden');
+    if (ckDiff)   ckDiff.classList.add('ck-hidden');
+    if (ckResult) ckResult.classList.add('ck-hidden');
+  }
   window.scrollTo(0, 0);
 }
 
@@ -786,36 +803,43 @@ hubCards.forEach(function(card) {
     if (game && window.dzSetInGame) window.dzSetInGame(game.screen);
 
     // Route to correct screen
-    if (game && game.screen === 'ttt')        { showTTT();     return; }
-    if (game && game.screen === 'rps')        { showRPS();     return; }
-    if (game && game.screen === 'tapbattle')  { showTap();     return; }
-    if (game && game.screen === 'duel2048')   { show2048();    return; }
-    if (game && game.screen === 'c4')         { showC4();      return; }
-    if (game && game.screen === 'cricket')    { showCricket(); return; }
-    if (game && game.screen === 'airhockey')  { showAH();      return; }
-    if (game && game.screen === 'passbreach') { showPB();      return; }
-    if (game && game.screen === 'memoryflip')  { showMFD();     return; }
-    if (game && game.screen === 'connectdots') { showCDD();     return; }
-    if (game && game.screen === 'chess')       { if (typeof showChess === 'function') { showChess(); return; } }
-    if (game && game.screen === 'battleship')  { showBattleship(); return; }
-    if (game && game.screen === 'checkers')    { showCheckers();   return; }
-    if (game && game.screen === 'darts')       { showDarts();      return; }
-    if (game && game.screen === 'tanks')       { showTanks();      return; }
-    if (game && game.screen === 'starcatcher') { showStarCatcher(); return; }
-    if (game && game.screen === 'spacedodge')  { showSpaceDodge();  return; }
-    if (game && game.screen === 'pingpong')    { showPingPong();     return; }
-    if (game && game.screen === 'minesweeper') { showMinesweeper();  return; }
-    if (game && game.screen === 'tetris')      { showTetris();       return; }
-    if (game && game.screen === 'bomberman')   { showBomberman();    return; }
-    if (game && game.screen === 'drawguess')   { showDrawGuess();    return; }
-    if (game && game.screen === 'reaction')    { showReaction();     return; }
-    if (game && game.screen === 'territory')   { showTerritory();    return; }
-    if (game && game.screen === 'ludo')        { showLudo();         return; }
-    if (game && game.screen === 'sudoku')      { showSudoku();       return; }
-    if (game && game.screen === 'carrom')      { showCarrom();       return; }
-
-    // Other games use the launch overlay placeholder
-    launchWithOverlay(gameName, accentColor);
+    if (game && game.screen === 'ttt')        { showTTT();     } else
+    if (game && game.screen === 'rps')        { showRPS();     } else
+    if (game && game.screen === 'tapbattle')  { showTap();     } else
+    if (game && game.screen === 'duel2048')   { show2048();    } else
+    if (game && game.screen === 'c4')         { showC4();      } else
+    if (game && game.screen === 'cricket')    { showCricket(); } else
+    if (game && game.screen === 'airhockey')  { showAH();      } else
+    if (game && game.screen === 'passbreach') { showPB();      } else
+    if (game && game.screen === 'memoryflip')  { showMFD();     } else
+    if (game && game.screen === 'connectdots') { showCDD();     } else
+    if (game && game.screen === 'chess')       { if (typeof showChess === 'function') showChess(); } else
+    if (game && game.screen === 'battleship')  { showBattleship(); } else
+    if (game && game.screen === 'checkers')    { showCheckers();   } else
+    if (game && game.screen === 'darts')       { showDarts();      } else
+    if (game && game.screen === 'tanks')       { showTanks();      } else
+    if (game && game.screen === 'starcatcher') { showStarCatcher(); } else
+    if (game && game.screen === 'spacedodge')  { showSpaceDodge();  } else
+    if (game && game.screen === 'pingpong')    { showPingPong();     } else
+    if (game && game.screen === 'minesweeper') { showMinesweeper();  } else
+    if (game && game.screen === 'tetris')      { showTetris();       } else
+    if (game && game.screen === 'bomberman')   { showBomberman();    } else
+    if (game && game.screen === 'drawguess')   { showDrawGuess();    } else
+    if (game && game.screen === 'reaction')    { showReaction();     } else
+    if (game && game.screen === 'territory')   { showTerritory();    } else
+    if (game && game.screen === 'ludo')        { showLudo();         } else
+    if (game && game.screen === 'sudoku')      { showSudoku();       } else
+    if (game && game.screen === 'carrom')      { showCarrom();       } else {
+      // Other games use the launch overlay placeholder
+      launchWithOverlay(gameName, accentColor);
+      return;
+    }
+    // BUG 4 FIX: orientation check never fired because show functions call
+    // hideAllScreens() directly, bypassing the window.dzShowScreen patch.
+    // Fire it here after every hub-card game launch so warnings trigger.
+    setTimeout(function() {
+      if (window.dzCheckOrientation) window.dzCheckOrientation();
+    }, 80);
   });
 
   card.addEventListener('keydown', function(evt) {
@@ -7832,6 +7856,12 @@ function dzNavShowHome() {
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
+
+  // BUG 4/6 FIX: dzNavShowHome bypasses dzShowScreen patch, so orientation
+  // dismiss-reset and re-check never fired when navigating home via menu/buttons.
+  setTimeout(function() {
+    if (window.dzCheckOrientation) window.dzCheckOrientation();
+  }, 80);
 
   _dzSetDropdownActive('dd-home-btn');
 }
