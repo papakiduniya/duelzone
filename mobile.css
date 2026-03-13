@@ -1137,3 +1137,58 @@
   }
 
 }
+
+/* ══════════════════════════════════════════════════════════════
+   § TETRIS DUEL — Landscape mobile overflow fix
+   Constrain each player column so both fit side-by-side within
+   the viewport without overflowing or clipping off-screen.
+   ══════════════════════════════════════════════════════════════ */
+@media (orientation: landscape) and (max-height: 540px) {
+
+  #tetris-play {
+    padding: 2px 6px 4px !important;
+    overflow-y: auto;
+  }
+
+  /* The outer flex row that holds both player columns */
+  #tetris-play > div:not(.dz-topbar):not([style*="text-align:center"]) {
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    align-items: flex-start;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Each player column — split viewport 50/50 minus gap */
+  #tetris-play > div:not(.dz-topbar):not([style*="text-align:center"]) > div {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: calc(50vw - 10px) !important;
+  }
+
+  /* Canvases scale down to fill their column */
+  #tetris-canvas-p1,
+  #tetris-canvas-p2 {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Next-piece preview — keep small */
+  #tetris-next-p1,
+  #tetris-next-p2 {
+    max-width: 52px !important;
+    height: auto !important;
+  }
+
+  /* Compact heading */
+  #tetris-play h1 {
+    font-size: 0.8rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Shrink score row text */
+  #tetris-play [style*="Score:"] {
+    font-size: 0.65rem !important;
+  }
+}
