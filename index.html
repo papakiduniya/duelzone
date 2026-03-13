@@ -2850,14 +2850,16 @@
     <div id="cdd-play" class="hidden cdd-play-wrap">
       <div class="dz-topbar">
         <button class="ghp-back-hub" onclick="window.dzNavShowHome&&window.dzNavShowHome()">← Hub</button>
-        <h2 id="cdd-title" style="font-family:'Orbitron',sans-serif;font-size:clamp(0.8rem,3vw,1rem);font-weight:900;margin:0;background:linear-gradient(90deg,#ff9100,#ffd060);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Connect Dots</h2>
         <button class="ghp-back-game" id="cdd-back-to-home">⚙ Setup</button>
       </div>
 
       <div id="cdd-app">
 
-        <!-- Mode label -->
-        <p id="cdd-mode-label">PvP</p>
+        <!-- Header -->
+        <div id="cdd-header">
+          <h2 id="cdd-title">Connect Dots</h2>
+          <p id="cdd-mode-label">PvP</p>
+        </div>
 
         <!-- Scoreboard -->
         <div id="cdd-scoreboard">
@@ -2869,8 +2871,8 @@
             <span class="cdd-vs">VS</span>
           </div>
           <div class="cdd-score-card" id="cdd-card-p2">
-            <span class="cdd-score-val" id="cdd-score-p2">0</span>
             <span class="cdd-player-label" id="cdd-p2-label">Player 2</span>
+            <span class="cdd-score-val" id="cdd-score-p2">0</span>
           </div>
         </div>
 
@@ -2902,7 +2904,6 @@
         <!-- Controls -->
         <div id="cdd-controls">
           <button id="cdd-reset-btn">↺ Reset</button>
-          <button id="cdd-hub-btn">← Hub</button>
         </div>
 
       </div><!-- /#cdd-app -->
@@ -3215,7 +3216,7 @@
       </div>
 
       <!-- Mode Selection Panel -->
-      <div id="ck-mode-panel" class="ck-overlay-panel ck-hidden">
+      <div id="ck-mode-panel" class="ck-overlay-panel">
         <div class="ck-panel-inner">
           <div class="ck-panel-title">Select Game Mode</div>
           <div class="ck-mode-btns">
