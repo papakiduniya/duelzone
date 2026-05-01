@@ -640,11 +640,12 @@
    *   total:  312px
    */
   function setLudoBoardSize() {
-    const vh = window.innerHeight || document.documentElement.clientHeight;
-    const reserved = 312;
-    const boardMax = Math.max(200, vh - reserved);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const isLandscape = vw > vh;
+    const reserved = isLandscape ? 120 : 312; // much less reserved in landscape
+    const boardMax = Math.max(160, vh - reserved);
     const app = $id('ludo-app');
-    const containerW = app ? (app.clientWidth || window.innerWidth) - 20 : window.innerWidth - 20;
+    const containerW = app ? (app.clientWidth || vw) - 20 : vw - 20;
     const size = Math.min(boardMax, containerW);
     document.documentElement.style.setProperty('--ludo-board-size', size + 'px');
   }
@@ -792,8 +793,11 @@
     }
 
     // One move: auto-execute
+    // Set phase='moving' immediately (not 'pick') so onBoardClick is blocked
+    // during the 420ms delay — otherwise a tap during the window calls pick()
+    // a second time and the token moves twice.
     if (moves.length===1) {
-      movable=moves; phase='pick';
+      movable=[]; phase='moving';
       setMsg('✅',`Rolled ${diceVal}!`);
       setTimeout(()=>pick(curPlayer,moves[0].ti), 420);
       return;
@@ -1048,19 +1052,54 @@
     bg.addColorStop(0,'#0b0d20'); bg.addColorStop(1,'#0e1018');
     ctx.fillStyle=bg; rrect(ctx,0,0,S,S,10); ctx.fill();
 
-    // Yard fills (radial gradient per color)
+    // ── Step 1: Draw every PATH cell as a clearly visible box ──
+    // Solid light fill + crisp border on every cell pieces can land on
+    PATH.forEach(([r,c])=>{
+      const x=c*cs, y=r*cs, pad=cs*0.05;
+      ctx.fillStyle='rgba(210,225,255,0.22)';
+      ctx.fillRect(x+pad,y+pad,cs-pad*2,cs-pad*2);
+      ctx.strokeStyle='rgba(180,205,255,0.65)';
+      ctx.lineWidth=1.2;
+      ctx.strokeRect(x+pad,y+pad,cs-pad*2,cs-pad*2);
+    });
+
+    // ── Step 2: Cross corridor non-path cells (visual continuity) ──
+    for (let r=6;r<=8;r++) for (let c=6;c<=8;c++) {
+      const onPath=PATH.some(([pr,pc])=>pr===r&&pc===c);
+      if (onPath||( r===7&&c===7)) continue;
+      const x=c*cs, y=r*cs, pad=cs*0.05;
+      ctx.fillStyle='rgba(255,255,255,0.07)';
+      ctx.fillRect(x+pad,y+pad,cs-pad*2,cs-pad*2);
+      ctx.strokeStyle='rgba(255,255,255,0.22)';
+      ctx.lineWidth=0.8;
+      ctx.strokeRect(x+pad,y+pad,cs-pad*2,cs-pad*2);
+    }
+
+    // ── Step 3: Light overall grid to frame the board ──
+    ctx.strokeStyle='rgba(180,200,255,0.25)'; ctx.lineWidth=0.5;
+    for (let i=0;i<=15;i++) {
+      ctx.beginPath(); ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,S); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i*cs); ctx.lineTo(S,i*cs); ctx.stroke();
+    }
+    // Bold cross corridor boundary
+    ctx.strokeStyle='rgba(200,220,255,0.55)'; ctx.lineWidth=1.8;
+    [6,9].forEach(i=>{
+      ctx.beginPath(); ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,S); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i*cs); ctx.lineTo(S,i*cs); ctx.stroke();
+    });
+
+    // Yard fills (radial gradient per color) — drawn OVER grid lines
     YARD_ZONE.forEach(([r,c],p)=>{
       const g=ctx.createRadialGradient((c+3)*cs,(r+3)*cs,0,(c+3)*cs,(r+3)*cs,3.2*cs);
-      g.addColorStop(0,CH[p]+'2c'); g.addColorStop(1,CH[p]+'08');
+      g.addColorStop(0,CH[p]+'60'); g.addColorStop(1,CH[p]+'20');
       ctx.fillStyle=g;
       rrect(ctx,c*cs+1,r*cs+1,6*cs-2,6*cs-2,cs*0.45); ctx.fill();
     });
 
-    // Cross cells + home columns
+    // Home column cells
     for (let r=0;r<15;r++) for (let c=0;c<15;c++) {
       const inCross=(r>=6&&r<=8)||(c>=6&&c<=8); if (!inCross) continue;
       const x=c*cs, y=r*cs;
-      ctx.fillStyle='rgba(255,255,255,0.028)'; ctx.fillRect(x,y,cs,cs);
       if      (r===7&&c>=1&&c<=6)  drawHomeCell(x,y,cs,0,c-1);
       else if (c===7&&r>=1&&r<=6)  drawHomeCell(x,y,cs,1,r-1);
       else if (r===7&&c>=8&&c<=13) drawHomeCell(x,y,cs,2,13-c);
@@ -1068,50 +1107,28 @@
       else if (r===7&&c===7)        drawCenterStar(x,y,cs);
     }
 
-    // Fine grid lines (whole board, subtle)
-    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=0.5;
-    for (let i=0;i<=15;i++) {
-      ctx.beginPath(); ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,S); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,i*cs); ctx.lineTo(S,i*cs); ctx.stroke();
-    }
-
-    // Bold grid lines on cross area columns & rows 6-9
-    ctx.strokeStyle='rgba(255,255,255,0.30)'; ctx.lineWidth=1.2;
-    for (let i=6;i<=9;i++) {
-      ctx.beginPath(); ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,S); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,i*cs); ctx.lineTo(S,i*cs); ctx.stroke();
-    }
-
     // Yard zone borders + inner ring + label
     YARD_ZONE.forEach(([r,c],p)=>{
-      ctx.strokeStyle=CH[p]+'cc'; ctx.lineWidth=2;
+      ctx.strokeStyle=CH[p]+'ee'; ctx.lineWidth=2.5;
       rrect(ctx,c*cs+1,r*cs+1,6*cs-2,6*cs-2,cs*0.45); ctx.stroke();
 
-      ctx.fillStyle='rgba(7,9,20,0.82)';
+      ctx.fillStyle='rgba(7,9,20,0.75)';
       rrect(ctx,(c+1)*cs+3,(r+1)*cs+3,4*cs-6,4*cs-6,cs*0.28); ctx.fill();
-      ctx.strokeStyle=CH[p]+'44'; ctx.lineWidth=1;
+      ctx.strokeStyle=CH[p]+'66'; ctx.lineWidth=1.5;
       rrect(ctx,(c+1)*cs+3,(r+1)*cs+3,4*cs-6,4*cs-6,cs*0.28); ctx.stroke();
 
-      ctx.fillStyle=CH[p]+'72'; ctx.font=`bold ${cs*0.52}px 'Orbitron',sans-serif`;
+      ctx.fillStyle=CH[p]+'99'; ctx.font=`bold ${cs*0.52}px 'Orbitron',sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(CN[p][0],(c+3)*cs,(r+0.62)*cs);
     });
 
-    // Path track tint
-    PATH.forEach(([r,c])=>{
-      if ((r>=6&&r<=8)||(c>=6&&c<=8)) {
-        ctx.fillStyle='rgba(255,255,255,0.038)';
-        ctx.fillRect(c*cs+0.5,r*cs+0.5,cs-1,cs-1);
-      }
-    });
-
-    // Start squares
+    // Start squares — solid colour fill so they pop
     START.forEach((idx,p)=>{
       const [r,c]=PATH[idx]; const x=c*cs,y=r*cs;
-      ctx.fillStyle=CH[p]+'55'; ctx.fillRect(x+1,y+1,cs-2,cs-2);
-      ctx.strokeStyle=CH[p]+'cc'; ctx.lineWidth=1.5;
-      ctx.strokeRect(x+1.5,y+1.5,cs-3,cs-3);
-      ctx.fillStyle=CH[p]; ctx.font=`bold ${cs*0.38}px 'DM Mono',monospace`;
+      ctx.fillStyle=CH[p]+'88'; ctx.fillRect(x+2,y+2,cs-4,cs-4);
+      ctx.strokeStyle=CH[p]; ctx.lineWidth=2;
+      ctx.strokeRect(x+2,y+2,cs-4,cs-4);
+      ctx.fillStyle='#fff'; ctx.font=`bold ${cs*0.42}px 'DM Mono',monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText('S',x+cs/2,y+cs/2);
     });
@@ -1164,9 +1181,9 @@
   }
 
   function drawHomeCell(x,y,cs,p,step) {
-    const a=Math.round(((step+1)/6)*170+35).toString(16).padStart(2,'0');
-    ctx.fillStyle=CH[p]+a; ctx.fillRect(x,y,cs,cs);
-    ctx.strokeStyle=CH[p]+'55'; ctx.lineWidth=0.5; ctx.strokeRect(x,y,cs,cs);
+    const a=Math.round(((step+1)/6)*110+90).toString(16).padStart(2,'0');
+    ctx.fillStyle=CH[p]+a; ctx.fillRect(x+0.5,y+0.5,cs-1,cs-1);
+    ctx.strokeStyle=CH[p]+'99'; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,cs-1,cs-1);
   }
 
   function drawCenterStar(x,y,cs) {
@@ -1238,6 +1255,25 @@
       }
     },55);
   }
+
+  /* ═══════════════════════════════════════════════════════
+     PUBLIC STOP / RESUME — called by dzPauseAllGames / dzResumeAllGames
+  ═══════════════════════════════════════════════════════ */
+  window.ludomStop = function () {
+    stopMusic();
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+  };
+
+  window.ludomResume = function () {
+    // Only restart if a game is in progress (ludo-play panel visible, not done)
+    var playEl = document.getElementById('ludo-play');
+    if (!playEl || playEl.classList.contains('hidden')) return;
+    if (phase === 'done') return;
+    // Restart RAF loop if it was cancelled
+    if (!animId) animId = requestAnimationFrame(loop);
+    // Restart background music (only if it was on before pause)
+    if (!musicOn) startMusic();
+  };
 
   /* ═══════════════════════════════════════════════════════
      INIT SETUP PREVIEW  (called once at script load)

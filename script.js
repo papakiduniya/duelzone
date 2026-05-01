@@ -4,6 +4,61 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────
+// GLOBAL AUDIO CONTEXT TRACKER
+// Patches window.AudioContext so every instance — including
+// those created by external game files (tetris.js, reaction.js,
+// pingpong.js, etc.) — is tracked in one array.
+// dzSuspendAllAudio() / dzResumeAllAudio() then work on ALL
+// sounds site-wide, not just SoundManager.
+// ─────────────────────────────────────────────────────────────
+window._DZ_AUDIO_CONTEXTS = [];
+window.DZ_PAUSED = false; // global flag; external game loops should check this
+
+(function() {
+  var _Orig = window.AudioContext || window.webkitAudioContext;
+  if (!_Orig) return;
+  function PatchedAudioContext(opts) {
+    // Explicitly returning an object from a constructor replaces `this` in JS
+    var inst;
+    try { inst = opts ? new _Orig(opts) : new _Orig(); } catch(e) { inst = new _Orig(); }
+    window._DZ_AUDIO_CONTEXTS.push(inst);
+    return inst;
+  }
+  PatchedAudioContext.prototype = _Orig.prototype;
+  window.AudioContext = PatchedAudioContext;
+  if (window.webkitAudioContext) window.webkitAudioContext = PatchedAudioContext;
+})();
+
+function dzPruneAudioContexts() {
+  // Remove closed or garbage-collected AudioContexts from the tracked list.
+  // Without this, every game session adds new contexts and the list grows
+  // unbounded, making every suspend/resume call iterate stale entries.
+  window._DZ_AUDIO_CONTEXTS = window._DZ_AUDIO_CONTEXTS.filter(function(c) {
+    return c && c.state !== 'closed';
+  });
+}
+function dzSuspendAllAudio() {
+  dzPruneAudioContexts();
+  window._DZ_AUDIO_CONTEXTS.forEach(function(c) {
+    try { if (c && c.state === 'running') c.suspend(); } catch(e) {}
+  });
+}
+function dzResumeAllAudio() {
+  dzPruneAudioContexts();
+  window._DZ_AUDIO_CONTEXTS.forEach(function(c) {
+    try {
+      if (c && c.state !== 'running' && c.state !== 'closed') {
+        c.resume().catch(function(){});
+      }
+    } catch(e) {}
+  });
+  // Also kick SoundManager's own context directly
+  if (typeof SoundManager !== 'undefined' && SoundManager.resumeCtx) {
+    try { SoundManager.resumeCtx(); } catch(e) {}
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // SECTION A: Screen Switching
 //
 // How it works:
@@ -31,6 +86,9 @@ var screenPB       = document.getElementById('screen-passbreach');
 var screenChess        = document.getElementById('screen-chess');
 var screenBattleship   = document.getElementById('screen-battleship');
 var screenCheckers     = document.getElementById('screen-checkers');
+// Module-level handle for the ad-interstitial countdown so rapid showHub() calls
+// don't stack multiple simultaneous intervals
+var _hubAdTick = null;
 var screenDarts        = document.getElementById('screen-darts');
 var screenTanks        = document.getElementById('screen-tanks');
 var screenStarCatcher  = document.getElementById('screen-starcatcher');
@@ -41,28 +99,52 @@ var screenTetris       = document.getElementById('screen-tetris');
 var screenBomberman    = document.getElementById('screen-bomberman');
 var screenReaction     = document.getElementById('screen-reaction');
 var screenTerritory    = document.getElementById('screen-territory');
+var screenDrawGuess    = document.getElementById('screen-drawguess'); // FIX 1: was missing, caused ReferenceError in showDrawGuess()
 // BUG 1 FIX: These screens were never added to ALL_SCREENS, so hideAllScreens()
 // never hid them — they would bleed through on top of the next game or hub.
 var screenLudo     = document.getElementById('screen-ludo');
 var screenSudoku   = document.getElementById('screen-sudoku');
 var screenCarrom   = document.getElementById('screen-carrom');
 
-var ALL_SCREENS = [screenHub, screenTTT, screenRPS, screenTap, screen2048, screenC4, screenCricket, screenAH, screenPB, screenChess, screenBattleship, screenCheckers, screenDarts, screenTanks, screenStarCatcher, screenSpaceDodge, screenPingPong, screenMinesweeper, screenTetris, screenBomberman, screenReaction, screenTerritory, screenLudo, screenSudoku, screenCarrom];
+var ALL_SCREENS = [screenHub, screenTTT, screenRPS, screenTap, screen2048, screenC4, screenCricket, screenAH, screenPB, screenChess, screenBattleship, screenCheckers, screenDarts, screenTanks, screenStarCatcher, screenSpaceDodge, screenPingPong, screenMinesweeper, screenTetris, screenBomberman, screenReaction, screenTerritory, screenLudo, screenSudoku, screenCarrom, screenDrawGuess];
 // Note: screenMFD and screenCDD are push()ed to ALL_SCREENS
 // later in their respective sections once their vars are declared.
 
+// Cached NodeList of every screen-* element — avoids repeated slow
+// attribute-prefix querySelectorAll('[id^="screen-"]') in hot navigation paths.
+// Refreshed lazily on first use after DOM is ready.
+var _ALL_SCREEN_ELS = null;
+function _getAllScreenEls() {
+  if (!_ALL_SCREEN_ELS) _ALL_SCREEN_ELS = document.querySelectorAll('[id^="screen-"]');
+  return _ALL_SCREEN_ELS;
+}
+
 function hideAllScreens() {
-  ALL_SCREENS.forEach(function(s){ if(s) s.classList.add('hidden'); });
+  // Use cached list — covers ALL screen-* elements including dynamically added ones.
+  _getAllScreenEls().forEach(function(s){ s.classList.add('hidden'); });
+  // Also hide fixed-position play panels (they escape parent display:none)
+  // tetris-play, rd-play, sdk-play, carrom-play sit at position:fixed and
+  // must be hidden explicitly when switching games.
+  if (typeof window.dzHideAllFixedPanels === 'function') {
+    window.dzHideAllFixedPanels();
+  } else {
+    // Fallback if dzHideAllFixedPanels not yet defined
+    ['tetris-play','rd-play','sdk-play','carrom-play'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.add('hidden'); el.style.setProperty('display','none','important'); }
+    });
+  }
 }
 
 function showHub() {
-  // Stop any running game loops so they don't bleed through in the background
-  ahStopLoop();
+  // FIX: stop every running game loop/timer/sound before doing anything else
+  if (typeof dzStopAllGames === 'function') dzStopAllGames();
 
   // Hide all fixed play panels and back buttons (position:fixed elements escape parent hide)
   ['mine-play','tetris-play','bm-play','rd-play',
    'tw-play','sdk-play','carrom-play','ludo-play'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.classList.add('hidden');
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('hidden'); el.style.setProperty('display','none','important'); }
   });
   ['mine-back-play','tetris-back-play','bm-back-play','rd-back-play',
    'tw-back-play','sdk-back-play','carrom-back-play','ludo-back-play'].forEach(function(id) {
@@ -72,27 +154,37 @@ function showHub() {
   document.body.style.overflow = '';
   document.body.style.overscrollBehavior = '';
 
-  // Show ad interstitial for 5 seconds, then navigate to hub
+  // Show ad interstitial for 3 seconds, then navigate to hub
   var adOverlay    = document.getElementById('dz-ad-interstitial');
-  var countdown    = document.getElementById('dz-ad-interstitial-countdown');
+  var countdown    = document.getElementById('dz-ad-countdown');
   var _doShowHub   = function() {
     if (adOverlay) adOverlay.style.display = 'none';
+    // Hide every screen-* div (querySelectorAll catches ones missing from ALL_SCREENS)
+    _getAllScreenEls().forEach(function(s){ s.classList.add('hidden'); });
     hideAllScreens();
+    // Remove dz-in-game BEFORE showing hub so CSS :has() selector sees correct state
+    document.body.classList.remove('dz-in-game');
+    // Clear the inline style set by dzShowGameMenuBtn so CSS default (hidden) takes over
+    var igBtn = document.getElementById('dz-ig-menu-btn');
+    if (igBtn) igBtn.style.removeProperty('display');
     screenHub.classList.remove('hidden');
     SoundManager.backToHub();
+    if (window.dzHideGameMenuBtn) window.dzHideGameMenuBtn();
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   };
   if (adOverlay) {
+    // Cancel any already-running countdown (rapid double-click protection)
+    if (_hubAdTick) { clearInterval(_hubAdTick); _hubAdTick = null; }
     adOverlay.style.display = 'flex';
-    if (countdown) countdown.textContent = '5';
-    var _secs = 5;
-    var _tick = setInterval(function() {
+    if (countdown) countdown.textContent = '3';
+    var _secs = 3;
+    _hubAdTick = setInterval(function() {
       _secs--;
       if (countdown) countdown.textContent = _secs;
       if (_secs <= 0) {
-        clearInterval(_tick);
+        clearInterval(_hubAdTick); _hubAdTick = null;
         _doShowHub();
       }
     }, 1000);
@@ -105,55 +197,72 @@ function showTTT() {
   hideAllScreens();
   screenTTT.classList.remove('hidden');
   tttRestart();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('ttt');
 }
 
 function showRPS() {
   hideAllScreens();
   screenRPS.classList.remove('hidden');
   rpsRestart();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('rps');
 }
 
 function showTap() {
   hideAllScreens();
   screenTap.classList.remove('hidden');
   tapReset();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('tapbattle');
 }
 
 function show2048() {
   hideAllScreens();
   screen2048.classList.remove('hidden');
   d2048Init();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('duel2048');
 }
 
 function showC4() {
   hideAllScreens();
   screenC4.classList.remove('hidden');
+  document.body.classList.add('dz-in-game');
+  // Stop any in-progress game before returning to home
+  c4GameActive = false;
+  if (c4BoardWrap) c4BoardWrap.classList.add('locked');
   var c4HomeEl = document.getElementById('c4-home');
   var c4PlayEl = document.getElementById('c4-play-panel');
   if (c4HomeEl) { c4HomeEl.classList.remove('hidden'); }
   if (c4PlayEl) { c4PlayEl.classList.add('hidden'); }
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('c4');
 }
 function showCricket() {
   hideAllScreens();
   screenCricket.classList.remove('hidden');
   cricResetToSetup();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('cricket');
 }
 
 function showAH() {
   hideAllScreens();
   screenAH.classList.remove('hidden');
+  document.body.classList.add('dz-in-game');
   var ahHome = document.getElementById('ah-home');
   var ahPlay = document.getElementById('ah-play-panel');
   if (ahHome) ahHome.classList.remove('hidden');
   if (ahPlay) ahPlay.classList.add('hidden');
   ahStopLoop();
   window.scrollTo(0, 0);
+  if(window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('airhockey');
 }
 
 function showPB() {
@@ -166,6 +275,8 @@ function showPB() {
   // Stop any running session
   if (pb && pb.timerInterval) { clearInterval(pb.timerInterval); pb.timerInterval = null; }
   if (pb) { pb.sessionOver = true; }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('passbreach');
   window.scrollTo(0, 0);
 }
 
@@ -177,6 +288,8 @@ function showChess() {
   var play = document.getElementById('chess-play-panel');
   if (home) home.classList.remove('hidden');
   if (play) play.classList.add('hidden');
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('chess');
   window.scrollTo(0, 0);
 }
 
@@ -184,6 +297,8 @@ function showBattleship() {
   hideAllScreens();
   screenBattleship.classList.remove('hidden');
   if (typeof bsInit === 'function') { bsInit(); }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('battleship');
   window.scrollTo(0, 0);
 }
 
@@ -191,6 +306,8 @@ function showCheckers() {
   hideAllScreens();
   screenCheckers.classList.remove('hidden');
   if (typeof ckInit === 'function') { ckInit(); }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('checkers');
   window.scrollTo(0, 0);
 }
 
@@ -198,33 +315,41 @@ function showDarts() {
   hideAllScreens();
   screenDarts.classList.remove('hidden');
   if (typeof dartsInit === 'function') { dartsInit(); }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('darts');
   window.scrollTo(0, 0);
 }
 
 function showTanks() {
   hideAllScreens();
-  screenTanks.classList.remove('hidden');
+  if (screenTanks) screenTanks.classList.remove('hidden');
   if (typeof tanksDestroy === 'function') { tanksDestroy(); }
   if (typeof tanksInit === 'function') { tanksInit(); }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('tanks');
   window.scrollTo(0, 0);
 }
 
 function showStarCatcher() {
   hideAllScreens();
-  screenStarCatcher.classList.remove('hidden');
+  if (screenStarCatcher) screenStarCatcher.classList.remove('hidden');
   if (typeof scDestroy === 'function') { scDestroy(); }
   if (typeof scInit === 'function') { scInit(); }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('starcatcher');
   window.scrollTo(0, 0);
 }
 
 function showSpaceDodge() {
   hideAllScreens();
-  screenSpaceDodge.classList.remove('hidden');
+  if (screenSpaceDodge) screenSpaceDodge.classList.remove('hidden');
   var sdHome = document.getElementById('sd-home');
   var sdPlay = document.getElementById('sd-play-panel');
   if (sdHome) sdHome.classList.remove('hidden');
   if (sdPlay) sdPlay.classList.add('hidden');
   if (typeof sdStopGame === 'function') sdStopGame();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('spacedodge');
   window.scrollTo(0, 0);
 }
 
@@ -232,6 +357,8 @@ function showPingPong() {
   hideAllScreens();
   screenPingPong.classList.remove('hidden');
   if (typeof ppInit === 'function') ppInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('pingpong');
   window.scrollTo(0, 0);
 }
 
@@ -241,6 +368,8 @@ function showMinesweeper() {
   hideAllScreens();
   if (screenMinesweeper) screenMinesweeper.classList.remove('hidden');
   if (typeof mineInit === 'function') mineInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('minesweeper');
   window.scrollTo(0, 0);
 }
 
@@ -250,6 +379,8 @@ function showTetris() {
   hideAllScreens();
   if (screenTetris) screenTetris.classList.remove('hidden');
   if (typeof tetrisInit === 'function') tetrisInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('tetris');
   window.scrollTo(0, 0);
 }
 
@@ -257,6 +388,8 @@ function showBomberman() {
   hideAllScreens();
   if (screenBomberman) screenBomberman.classList.remove('hidden');
   if (typeof bombermanInit === 'function') bombermanInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('bomberman');
   window.scrollTo(0, 0);
 }
 
@@ -264,6 +397,8 @@ function showDrawGuess() {
   hideAllScreens();
   if (screenDrawGuess) screenDrawGuess.classList.remove('hidden');
   if (typeof drawguessInit === 'function') drawguessInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('drawguess');
   window.scrollTo(0, 0);
 }
 
@@ -273,6 +408,8 @@ function showReaction() {
   hideAllScreens();
   if (screenReaction) screenReaction.classList.remove('hidden');
   if (typeof reactionInit === 'function') reactionInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('reaction');
   window.scrollTo(0, 0);
 }
 
@@ -280,6 +417,8 @@ function showTerritory() {
   hideAllScreens();
   if (screenTerritory) screenTerritory.classList.remove('hidden');
   if (typeof territoryInit === 'function') territoryInit();
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('territory');
   window.scrollTo(0, 0);
 }
 
@@ -298,11 +437,14 @@ function showLudo() {
     if (home) home.classList.remove('hidden');
     if (play) play.classList.add('hidden');
   }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('ludo');
   window.scrollTo(0, 0);
 }
 
 function showSudoku() {
   hideAllScreens();
+  document.body.classList.add('dz-in-game');
   var s = document.getElementById('screen-sudoku');
   if (s) {
     s.classList.remove('hidden');
@@ -311,6 +453,7 @@ function showSudoku() {
     if (home) home.classList.remove('hidden');
     if (play) play.classList.add('hidden');
   }
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('sudoku');
   window.scrollTo(0, 0);
 }
 
@@ -324,6 +467,8 @@ function showCarrom() {
     if (home) home.classList.remove('hidden');
     if (play) play.classList.add('hidden');
   }
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('carrom');
   window.scrollTo(0, 0);
 }
 
@@ -404,6 +549,14 @@ var SoundManager = (function() {
     toggleMute: function() { _muted = !_muted; return _muted; },
     isMuted: function() { return _muted; },
     setVolume: function(v) { _masterVol = Math.max(0, Math.min(1, v)); },
+    // Expose the internal AudioContext so dzResumeAllAudio can kick it directly
+    get _ctx() { return _ctx; },
+    // Force-resume the audio context (called by dzResumeAllAudio)
+    resumeCtx: function() {
+      if (_ctx && _ctx.state !== 'running') {
+        try { _ctx.resume().catch(function(){}); } catch(e) {}
+      }
+    },
 
     // ── Common ──────────────────────────────────────────────
     click: function() {
@@ -774,6 +927,7 @@ hubCards.forEach(function(card) {
 
   card.addEventListener('click', function(evt) {
     if (overlay.classList.contains('active')) return;
+    if (evt.target.closest('.card-setup-btn')) return;
     if (evt.target.closest('.card-save-btn'))  return;
 
     var gameName    = card.getAttribute('data-game');
@@ -784,9 +938,6 @@ hubCards.forEach(function(card) {
 
     // Track recently played
     if (game) dzTrackRecentGame(gameName, game.screen, accentColor);
-
-    // Show Hub & Setup in dropdown menu when in-game
-    if (game && window.dzSetInGame) window.dzSetInGame(game.screen);
 
     // Route to correct screen
     if (game && game.screen === 'ttt')        { showTTT();     return; }
@@ -850,6 +1001,7 @@ var tttMark        = 'X';
 var tttActive      = true;
 var tttScores      = { X:0, O:0 };
 var tttNames       = { X:'Player 1', O:'Player 2' };
+var tttBotTimeout  = null;  // handle for pending bot think setTimeout
 
 var tttWinPatterns = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -941,11 +1093,8 @@ function ttFindWin(mark){
 }
 function tttBotEasy(){var e=tttEmpty();return e[Math.floor(Math.random()*e.length)];}
 function tttBotMed(){
-  var w=ttFindWin('O'); if(w!==-1) return w;   // win if possible
-  var b=ttFindWin('X'); if(b!==-1) return b;   // block X from winning
-  // Prefer centre, then corners, then edges
-  var prio=[4,0,2,6,8,1,3,5,7];
-  for(var i=0;i<prio.length;i++){ if(tttBoard[prio[i]]==='') return prio[i]; }
+  var w=ttFindWin('O'); if(w!==-1) return w; // win if possible
+  var b=ttFindWin('X'); if(b!==-1) return b; // block player's winning move
   return tttBotEasy();
 }
 function tttMinimax(isMax, depth, alpha, beta) {
@@ -955,15 +1104,11 @@ function tttMinimax(isMax, depth, alpha, beta) {
   if (xWin) return depth - 10;
   var empty = tttEmpty();
   if (!empty.length) return 0;
-  // FIX: declare best/s/i once at function scope — avoids ES5 var-hoisting bug
-  // where 'var best = Infinity' in the else branch was silently a no-op,
-  // because hoisting merged both declarations into one (initialized to undefined).
-  var best, s, i;
   if (isMax) {
-    best = -Infinity;
-    for (i = 0; i < empty.length; i++) {
+    var best = -Infinity;
+    for (var i = 0; i < empty.length; i++) {
       tttBoard[empty[i]] = 'O';
-      s = tttMinimax(false, depth + 1, alpha, beta);
+      var s = tttMinimax(false, depth + 1, alpha, beta);
       tttBoard[empty[i]] = '';
       if (s > best) best = s;
       if (s > alpha) alpha = s;
@@ -971,10 +1116,10 @@ function tttMinimax(isMax, depth, alpha, beta) {
     }
     return best;
   } else {
-    best = Infinity;
-    for (i = 0; i < empty.length; i++) {
+    var best = Infinity;
+    for (var i = 0; i < empty.length; i++) {
       tttBoard[empty[i]] = 'X';
-      s = tttMinimax(true, depth + 1, alpha, beta);
+      var s = tttMinimax(true, depth + 1, alpha, beta);
       tttBoard[empty[i]] = '';
       if (s < best) best = s;
       if (s < beta) beta = s;
@@ -1039,7 +1184,8 @@ function tttTriggerBot(){
   tttBoardEl.classList.add('disabled');
   var lbl=tttDifficulty.charAt(0).toUpperCase()+tttDifficulty.slice(1);
   tttStatus.textContent='Bot is thinking… ('+lbl+')'; tttStatus.className='thinking';
-  setTimeout(function(){
+  tttBotTimeout = setTimeout(function(){
+    tttBotTimeout = null;
     if(!tttActive)return;
     var idx=tttBotMove(); if(idx===undefined||idx===-1)return;
     tttBoardEl.classList.remove('disabled');
@@ -1063,6 +1209,8 @@ function tttClick(e){
 
 // Restart  ← also called by showTTT() on each entry from hub
 function tttRestart(){
+  // Cancel any pending bot think so it can't place on the freshly cleared board
+  if(tttBotTimeout){ clearTimeout(tttBotTimeout); tttBotTimeout = null; }
   tttBoard=['','','','','','','','',''];
   tttMark='X'; tttActive=true;
   tttStatus.textContent=tttNames['X']+"'s Turn"; tttStatus.className='';
@@ -1212,9 +1360,13 @@ function rpsRevealChoices(p1c, p2c) {
 
   rpsRound++;
   rpsRoundNumEl.textContent = rpsRound;
-  rpsP1Choice = null; rpsAwaitingP2 = false; rpsLocked = false;
+  rpsP1Choice = null; rpsAwaitingP2 = false;
+  // BUG 1 FIX: rpsLocked stays true until the 1200 ms animation completes.
+  // Moving it inside the setTimeout prevents P1 from spam-clicking in PvE
+  // mode and triggering a new round while the reveal animation is still running.
 
   setTimeout(function(){
+    rpsLocked = false;
     rpsP1EmojiEl.textContent = '?'; rpsP2EmojiEl.textContent = '?';
     rpsResultEl.textContent = '';
     rpsResultEl.className = '';
@@ -1231,7 +1383,7 @@ function rpsRevealChoices(p1c, p2c) {
 }
 
 function rpsHandleP1Pick(choice) {
-  if (rpsLocked) return;
+  if (rpsLocked || rpsAwaitingP2) return;
   SoundManager.rpsSelect();
   rpsLastP1 = choice;
   rpsHistory.push(choice);
@@ -1270,6 +1422,13 @@ function rpsRestart() {
   rpsBtnsP1El.classList.remove('hidden');
   rpsBtnsP2El.classList.add('hidden');
   rpsPickPrompt.textContent = (rpsMode === 'pvp') ? 'Player 1 — Choose your weapon!' : 'Choose your weapon!';
+  // Re-sync Best Of button highlight (may be out of sync if restarted mid-match)
+  var boMap = {3:'rps-bo3', 5:'rps-bo5', 7:'rps-bo7'};
+  ['rps-bo3','rps-bo5','rps-bo7'].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove('active'); });
+  var activeBoId = boMap[rpsBestOf];
+  if (activeBoId) { var el = document.getElementById(activeBoId); if (el) el.classList.add('active'); }
+  // Sync BO counter display
+  if (rpsBoNumEl) rpsBoNumEl.textContent = rpsBestOf;
   // Hide in-game settings during active play
   var rpsApp = document.getElementById('rps-app');
   if (rpsApp) rpsApp.classList.add('rps-game-active');
@@ -1360,8 +1519,8 @@ var tapHintP2El     = document.getElementById('tap-hint-p2');
 var tapModeLabel    = document.getElementById('tap-mode-label');
 
 function tapStop() {
-  clearInterval(tapBotInterval); tapBotInterval = null;
-  clearInterval(tapCountTimer);  tapCountTimer  = null;
+  clearInterval(tapBotInterval); clearTimeout(tapBotInterval); tapBotInterval = null;
+  clearInterval(tapCountTimer);  clearTimeout(tapCountTimer);  tapCountTimer  = null;
   tapActive = false; tapCountdown = false;
 }
 
@@ -1454,27 +1613,40 @@ function tapRegisterHit(player) {
 }
 
 // Tap sides
-tapLeftEl.addEventListener('click', function(){
-  if (!tapActive && !tapCountdown) { tapStartCountdown(); return; }
-  tapRegisterHit('p1');
-});
+// FIX TAP-1: On mobile every physical tap fires touchstart followed by a
+// synthetic click. e.preventDefault() should suppress the click, but is
+// unreliable across browsers — so each tap was counted twice.
+// Fix: record the timestamp of each touchstart; the click handler bails
+// out if it fires within 500 ms of a touch (the browser click always
+// arrives well within that window).
+var _tapLeftLastTouch  = 0;
+var _tapRightLastTouch = 0;
+
 tapLeftEl.addEventListener('touchstart', function(e){
   e.preventDefault();
+  _tapLeftLastTouch = Date.now();
   if (!tapActive && !tapCountdown) { tapStartCountdown(); return; }
   tapRegisterHit('p1');
 }, { passive: false });
-
-tapRightEl.addEventListener('click', function(){
-  if (tapMode === 'pve') return; // bot only
+tapLeftEl.addEventListener('click', function(){
+  if (Date.now() - _tapLeftLastTouch < 500) return; // suppress synthetic post-touch click
   if (!tapActive && !tapCountdown) { tapStartCountdown(); return; }
-  tapRegisterHit('p2');
+  tapRegisterHit('p1');
 });
+
 tapRightEl.addEventListener('touchstart', function(e){
   e.preventDefault();
   if (tapMode === 'pve') return;
+  _tapRightLastTouch = Date.now();
   if (!tapActive && !tapCountdown) { tapStartCountdown(); return; }
   tapRegisterHit('p2');
 }, { passive: false });
+tapRightEl.addEventListener('click', function(){
+  if (tapMode === 'pve') return; // bot only
+  if (Date.now() - _tapRightLastTouch < 500) return; // suppress synthetic post-touch click
+  if (!tapActive && !tapCountdown) { tapStartCountdown(); return; }
+  tapRegisterHit('p2');
+});
 
 // Mode buttons
 document.getElementById('tap-btn-pvp').addEventListener('click', function(){
@@ -1528,6 +1700,7 @@ var d2048Active  = [true, true];
 var d2048TileId  = 0;
 var d2048Locked  = [false, false]; // true while animation is running
 var d2048BotTimer = null;
+var d2048Gen     = 0;  // incremented on every init; stale animation callbacks compare against this
 
 // ── DOM refs ───────────────────────────────────────────────────
 var d2048StatusEl   = document.getElementById('d2048-status');
@@ -1690,6 +1863,7 @@ function d2048ComputeMove(pIdx, dir) {
 function d2048DoMove(pIdx, dir, onDone) {
   if (d2048Locked[pIdx] || !d2048Active[pIdx]) return false;
 
+  var myGen = d2048Gen;  // capture current generation; if d2048Init runs before callback fires, gen changes
   var comp = d2048ComputeMove(pIdx, dir);
 
   if (!comp.changed) {
@@ -1730,6 +1904,8 @@ function d2048DoMove(pIdx, dir, onDone) {
 
   // After animation: commit merges, spawn new tile, check win/loss
   setTimeout(function() {
+    // Abort if game was restarted/reset while animation was in flight
+    if (d2048Gen !== myGen) return;
     // Remove merge source tiles from state + DOM
     comp.merges.forEach(function(m) {
       [m.srcA, m.srcB].forEach(function(id) {
@@ -1768,7 +1944,7 @@ function d2048DoMove(pIdx, dir, onDone) {
     // Check WIN (reached 2048 or higher)
     if (maxTile >= 2048) {
       d2048Active[pIdx] = false;
-      clearInterval(d2048BotTimer); d2048BotTimer = null;
+      clearInterval(d2048BotTimer); clearTimeout(d2048BotTimer); d2048BotTimer = null;
       var wName = pIdx === 0 ? 'Player 1' : (d2048Mode === 'pve' ? 'Bot' : 'Player 2');
       d2048ShowWin(wName, 'Reached ' + maxTile + '! · Score: ' + d2048Scores[pIdx]);
       d2048Locked[pIdx] = false;
@@ -1781,7 +1957,7 @@ function d2048DoMove(pIdx, dir, onDone) {
     // Check GAME OVER (no valid moves left)
     if (!d2048CanMove(pIdx)) {
       d2048Active[pIdx] = false;
-      clearInterval(d2048BotTimer); d2048BotTimer = null;
+      clearInterval(d2048BotTimer); clearTimeout(d2048BotTimer); d2048BotTimer = null;
       var loserName  = pIdx === 0 ? 'Player 1' : (d2048Mode === 'pve' ? 'Bot' : 'Player 2');
       var winnerName = pIdx === 0 ? (d2048Mode === 'pve' ? 'Bot' : 'Player 2') : 'Player 1';
       d2048ShowWin(winnerName, loserName + '\'s board is full · Score: ' + d2048Scores[1 - pIdx]);
@@ -1796,6 +1972,7 @@ function d2048DoMove(pIdx, dir, onDone) {
   return true;
 }
 
+// d2048CanMove — correctly checks if the player has any valid move left
 function d2048CanMove(pIdx) {
   var grid = [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]];
   d2048Tiles[pIdx].forEach(function(t) { grid[t.row][t.col] = t.value; });
@@ -2052,8 +2229,9 @@ function d2048StartSimBot() {
 // ── Init ────────────────────────────────────────────────────────
 function d2048Init() {
   clearInterval(d2048BotTimer);
-  clearTimeout(d2048BotTimer);
+  clearTimeout(d2048BotTimer);  // clear before nulling so any pending pve timeout is cancelled
   d2048BotTimer = null;
+  d2048Gen++;  // invalidate any in-flight animation callbacks from the previous session
 
   d2048Tiles      = [[], []];
   d2048Scores     = [0, 0];
@@ -2400,6 +2578,13 @@ function cricEndInnings() {
     cricPlayBNum.textContent = '?';
     cricPlayResult.textContent = '🔁 Innings over — ' + cricBatterName() + ' bats now!';
     if (cricIsPvP) {
+      // Hide all PvP pass-screen panels so cricPvpResetBall starts from a clean state
+      var pp1  = document.getElementById('cric-pvp-pp1');
+      var pass = document.getElementById('cric-pvp-pp-pass');
+      var pp2  = document.getElementById('cric-pvp-pp2');
+      if (pp1)  pp1.classList.add('hidden');
+      if (pass) pass.classList.add('hidden');
+      if (pp2)  pp2.classList.add('hidden');
       setTimeout(function() {
         cricPlayResult.textContent = '—';
         cricPvpResetBall();
@@ -2457,14 +2642,23 @@ function cricSetNumpadDisabled(disabled) {
 function cricHandlePlay(playerNum) {
   if (cricNumpadLocked) return;
   cricSetNumpadDisabled(true);
-  cricPlayerHistory.push(playerNum);
 
+  // FIX CRIC-1: history was pushed BEFORE cricBotPick() was called, so the bot
+  // could read the player's current-ball pick via:
+  //   last = cricPlayerHistory[cricPlayerHistory.length - 1]
+  // In medium mode when bowling it returned `last` directly — the player's own
+  // number — giving a near-guaranteed out every ball (55 % of the time).
+  // Fix: let the bot pick first based on PAST history only, then record the
+  // current pick so it informs future balls.
   var botNum = cricBotPick();
+  cricPlayerHistory.push(playerNum); // record AFTER bot has committed its pick
   cricPlayPNum.textContent = playerNum;
   cricPlayBNum.textContent = '...';
   cricNumPop(cricPlayPNum);
 
   setTimeout(function() {
+    // Abort if player navigated away from cricket screen during the reveal delay
+    if (screenCricket && screenCricket.classList.contains('hidden')) return;
     cricPlayBNum.textContent = botNum;
     cricNumPop(cricPlayBNum);
 
@@ -2977,6 +3171,7 @@ function startTTTGame() {
   hidePanel('ttt-home');
   showPanel('ttt-play-panel');
   tttRestart();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
 }
 
@@ -2986,6 +3181,7 @@ showTTT = function() {
   hideAllScreens();
   screenTTT.classList.remove('hidden');
   showTTTHome();
+  document.body.classList.add('dz-in-game');
 };
 
 // TTT home page button wiring
@@ -3037,6 +3233,7 @@ function startRPSGame() {
   hidePanel('rps-home');
   showPanel('rps-play-panel');
   rpsRestart();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
 }
 
@@ -3045,6 +3242,7 @@ showRPS = function() {
   hideAllScreens();
   screenRPS.classList.remove('hidden');
   showRPSHome();
+  document.body.classList.add('dz-in-game');
 };
 
 document.getElementById('rps-home-back').addEventListener('click', showHub);
@@ -3103,6 +3301,7 @@ function startTapGame() {
   hidePanel('tap-home');
   showPanel('tap-play-panel');
   tapReset();
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
 }
 
@@ -3111,6 +3310,7 @@ showTap = function() {
   hideAllScreens();
   screenTap.classList.remove('hidden');
   showTapHome();
+  document.body.classList.add('dz-in-game');
 };
 
 document.getElementById('tap-home-back').addEventListener('click', function(){
@@ -3163,6 +3363,7 @@ function startD2048Game() {
   if (d2048HP_mode !== 'pvp')  document.getElementById('d2048-'+d2048HP_diff).click();
   hidePanel('d2048-home');
   showPanel('d2048-play-panel');
+  document.body.classList.add('dz-in-game');
   window.scrollTo(0, 0);
 }
 
@@ -3171,15 +3372,16 @@ show2048 = function() {
   hideAllScreens();
   screen2048.classList.remove('hidden');
   showD2048Home();
+  document.body.classList.add('dz-in-game');
 };
 
 document.getElementById('d2048-home-back').addEventListener('click', function(){
-  clearInterval(d2048BotTimer); d2048BotTimer = null;
+  clearInterval(d2048BotTimer); clearTimeout(d2048BotTimer); d2048BotTimer = null;
   showHub();
 });
 document.getElementById('d2048-hp-start').addEventListener('click', startD2048Game);
 document.getElementById('d2048-back-to-home').addEventListener('click', function(){
-  clearInterval(d2048BotTimer); d2048BotTimer = null;
+  clearInterval(d2048BotTimer); clearTimeout(d2048BotTimer); d2048BotTimer = null;
   showD2048Home();
 });
 
@@ -3474,16 +3676,9 @@ function c4UpdateGhostDisc(hoveredCol) {
 function c4BotDrop(col) {
   // Bot bypass: skip the pve+P2 guard since this IS the bot turn
   if (!c4GameActive) return;
-  if (col < 0 || col >= C4_COLS) return;
+  if (col === undefined || col === null || col < 0 || col >= C4_COLS) return;
   var row = c4GetNextOpenRow(c4Board, col);
-  if (row === -1) {
-    // Bot returned a full column — pick any valid column instead of resetting the whole game
-    var fallback = c4GetValidColumns(c4Board);
-    if (!fallback.length) { c4EndGame(null, null); return; }
-    col = fallback[Math.floor(Math.random() * fallback.length)];
-    row = c4GetNextOpenRow(c4Board, col);
-    if (row === -1) return; // should never happen
-  }
+  if (row === -1) return; // FIX: invalid column — skip move instead of wiping scores with c4ResetGame()
   c4Board[row][col] = c4CurrentPlayer;
   c4RenderCell(row, col, c4CurrentPlayer, true);
   SoundManager.c4Drop();
@@ -3615,6 +3810,7 @@ function startC4Game() {
   c4ResetGame();
   document.getElementById('c4-home').classList.add('hidden');
   document.getElementById('c4-play-panel').classList.remove('hidden');
+  document.body.classList.add('dz-in-game');
 }
 
 document.getElementById('c4-hp-start').addEventListener('click', startC4Game);
@@ -3753,6 +3949,9 @@ function ahStopLoop() {
   ahRunning = false;
   if (ahRAF) { cancelAnimationFrame(ahRAF); ahRAF = null; }
   window.removeEventListener('resize', ahResize);
+  // Reset all key states so a held key can't cause drift in the next session
+  ahPaddles[0].key = { up:false, dn:false, lt:false, rt:false };
+  ahPaddles[1].key = { up:false, dn:false, lt:false, rt:false };
 }
 
 function ahResize() {
@@ -3796,6 +3995,7 @@ function ahResetPositions(serveWho) {
   ahPaddles[1].pvx = ahPaddles[1].pvy = 0;
   ahServeWho    = serveWho;
   ahGoalFreezeMs = 1300;  // 1.3 seconds, fully time-based
+  ahStuckTimer  = 0;      // prevent rescue nudge firing immediately after a goal
   // BUG FIX: serve velocity in px/second; give it a real angle
   // dir= -1 → puck launches upward (toward bot goal) when P1 serves
   // dir= +1 → puck launches downward (toward P1 goal) when bot serves
@@ -4055,7 +4255,13 @@ function ahShowGoalFlash(who) {
   el.className = 'ah-goal-flash ah-goal-flash--' + (who === 0 ? 'p1' : 'p2');
   el.textContent = '⚡ GOAL!';
   el.style.display = 'flex';
-  setTimeout(function() { el.style.display = 'none'; }, 1100);
+  // Clear any previous timer so a rapid second goal doesn't
+  // get hidden early by the first goal's outstanding setTimeout.
+  if (el._flashTimer) clearTimeout(el._flashTimer);
+  el._flashTimer = setTimeout(function() {
+    el.style.display = 'none';
+    el._flashTimer = null;
+  }, 1100);
 }
 
 function ahGameOver(winner) {
@@ -4071,7 +4277,8 @@ function ahGameOver(winner) {
     '<div class="ah-win-title" style="color:' + color + '">' + label + ' WINS!</div>' +
     '<div class="ah-win-score">' + ahP1Score + ' – ' + ahP2Score + '</div>' +
     '<button class="ah-win-btn" onclick="startAHGame()">↺ Play Again</button>' +
-    '<button class="ah-win-btn ah-win-btn--sec" onclick="showAH()">← Menu</button>';
+    '<button class="ah-win-btn ah-win-btn--sec" onclick="showAH()">⚙ Setup</button>' +
+    '<button class="ah-win-btn ah-win-btn--sec" onclick="window.dzNavShowHome&&window.dzNavShowHome()">⬅ Hub</button>';
 }
 
 function ahUpdateScoreUI() {
@@ -4099,6 +4306,9 @@ var ahLastTime = 0;
 function ahLoop(ts) {
   if (!ahRunning) return;
 
+  // Honour global pause flag (hamburger menu open, etc.)
+  if (window.DZ_PAUSED) { ahLastTime = ts; ahRAF = requestAnimationFrame(ahLoop); return; }
+
   // Reset timing when tab was hidden to prevent physics explosion on resume
   if (document.hidden) { ahLastTime = ts; ahRAF = requestAnimationFrame(ahLoop); return; }
 
@@ -4114,9 +4324,10 @@ function ahLoop(ts) {
   // ── Goal-freeze countdown (ms-based, frame-rate independent) ──
   if (ahGoalFreezeMs > 0) {
     ahGoalFreezeMs -= dt;
-    // BUG FIX: also clamp paddles during freeze so neither player crosses centre
+    // Clamp both paddles during freeze — prevents bot drifting in PvB
+    // and stops either player crossing centre in PvP.
     ahClampPaddle(ahPaddles[0], 0);
-    if (ahMode === 'pvp') ahClampPaddle(ahPaddles[1], 1);
+    ahClampPaddle(ahPaddles[1], 1);
     if (ahGoalFreezeMs <= 0) {
       ahGoalFreezeMs = 0;
       if (ahPuck.vServe) {
@@ -4132,33 +4343,32 @@ function ahLoop(ts) {
   // Move bot paddle (dt-based, px/s)
   ahMoveBot(dt);
 
-  // ── Keyboard: P1 ── BUG FIX: dt-based speed in px/s, not px/frame ──
-  var kSpd = ahW * 1.35 * (dt / 1000); // px for this frame
-  var p0   = ahPaddles[0];
-  if (p0.key.up) { p0.pvy = -kSpd; p0.y += p0.pvy; }
-  else if (p0.key.dn) { p0.pvy = kSpd; p0.y += p0.pvy; }
+  // ── Keyboard: P1 ─────────────────────────────────────────────
+  // kSpdPS = paddle speed in px/s (used for collision response).
+  // kStep  = pixels to move this frame = kSpdPS * dt/1000.
+  // pvx/pvy must be px/s so ahResolvePaddlePuck() imparts correct momentum.
+  // Previously pvx was set to px/frame then divided by (dt/1000) — circular,
+  // producing ahW*1.35 regardless of dt and causing erratic hit response.
+  var kSpdPS = ahW * 1.35;              // px/s — constant, frame-rate independent
+  var kStep  = kSpdPS * (dt / 1000);   // px to move this frame
+  var p0 = ahPaddles[0];
+  if (p0.key.up) { p0.y -= kStep; p0.pvy = -kSpdPS; }
+  else if (p0.key.dn) { p0.y += kStep; p0.pvy = kSpdPS; }
   else { p0.pvy = 0; }
-  if (p0.key.lt) { p0.pvx = -kSpd; p0.x += p0.pvx; }
-  else if (p0.key.rt) { p0.pvx = kSpd; p0.x += p0.pvx; }
+  if (p0.key.lt) { p0.x -= kStep; p0.pvx = -kSpdPS; }
+  else if (p0.key.rt) { p0.x += kStep; p0.pvx = kSpdPS; }
   else { p0.pvx = 0; }
-  // Convert px/frame to px/s for collision response
-  p0.pvx = dt > 0 ? p0.pvx / (dt / 1000) : 0;
-  p0.pvy = dt > 0 ? p0.pvy / (dt / 1000) : 0;
   ahClampPaddle(p0, 0);
-  // Re-read actual pixel delta for pvx/pvy after clamp (re-scale to px/s)
-  // (already done above — pvx/pvy are now px/s)
 
   // ── Keyboard: P2 (PvP only) ───────────────────────────────
   if (ahMode === 'pvp') {
     var p1 = ahPaddles[1];
-    if (p1.key.up) { p1.pvy = -kSpd; p1.y += p1.pvy; }
-    else if (p1.key.dn) { p1.pvy = kSpd; p1.y += p1.pvy; }
+    if (p1.key.up) { p1.y -= kStep; p1.pvy = -kSpdPS; }
+    else if (p1.key.dn) { p1.y += kStep; p1.pvy = kSpdPS; }
     else { p1.pvy = 0; }
-    if (p1.key.lt) { p1.pvx = -kSpd; p1.x += p1.pvx; }
-    else if (p1.key.rt) { p1.pvx = kSpd; p1.x += p1.pvx; }
+    if (p1.key.lt) { p1.x -= kStep; p1.pvx = -kSpdPS; }
+    else if (p1.key.rt) { p1.x += kStep; p1.pvx = kSpdPS; }
     else { p1.pvx = 0; }
-    p1.pvx = dt > 0 ? p1.pvx / (dt / 1000) : 0;
-    p1.pvy = dt > 0 ? p1.pvy / (dt / 1000) : 0;
     ahClampPaddle(p1, 1);
   }
 
@@ -4619,11 +4829,12 @@ function startAHGame() {
   document.getElementById('ah-pause-btn').textContent = '⏸';
   ahInit();
   ahRunning = true;
-  ahLastTime = 0; // safe 16ms default on first frame
+  ahLastTime = 0;
   ahRAF = requestAnimationFrame(ahLoop);
   ahUpdatePips('ah-p1-pips', 0, ahWinScore, '#00e5ff');
   ahUpdatePips('ah-p2-pips', 0, ahWinScore, '#ff4081');
   SoundManager.ahPuckStart();
+  document.body.classList.add('dz-in-game');
 }
 
 
@@ -4825,7 +5036,7 @@ function pbSubmitGuess() {
   document.getElementById('pb-attempts-val').textContent = pb.attempts;
 
   var feedback = pbGetFeedback(guess, pb.secret);
-  pb.guessHistory.push({ guess: guess, feedback: feedback });
+  pb.guessHistory.push({ guess: guess, feedback: feedback }); // FIX: populate so pbGiveHint can detect already-found positions
   pbRenderRow(guess, feedback, pb.attempts);
 
   // Play sounds based on feedback
@@ -5013,7 +5224,8 @@ function pbStartGame() {
     var el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('click', function() {
-      document.querySelectorAll('[data-diff]').forEach(function(b){ b.classList.remove('active'); });
+      // Scoped selector — only affect PB's own difficulty buttons
+      document.querySelectorAll('#pb-home [data-diff]').forEach(function(b){ b.classList.remove('active'); });
       this.classList.add('active');
       pb.diff = this.getAttribute('data-diff');
     });
@@ -5051,7 +5263,7 @@ function pbStartGame() {
         }
         return;
       }
-      // Digit — only add if no repeat
+      // Digit — only add if no repeat and not full
       if (pb.currentInput.length < 4 && pb.currentInput.indexOf(val) === -1) {
         pb.currentInput += val;
         pbUpdateCells();
@@ -5060,8 +5272,8 @@ function pbStartGame() {
         var k = this;
         k.classList.add('pb-numpad-press');
         setTimeout(function(){ k.classList.remove('pb-numpad-press'); }, 120);
-      } else if (pb.currentInput.indexOf(val) !== -1) {
-        // Shake: digit already used
+      } else if (pb.currentInput.indexOf(val) !== -1 || pb.currentInput.length >= 4) {
+        // Shake: digit already used OR input full — give feedback either way
         var k = this;
         k.classList.add('pb-numpad-shake');
         setTimeout(function(){ k.classList.remove('pb-numpad-shake'); }, 300);
@@ -5083,7 +5295,7 @@ function pbStartGame() {
         pb.currentInput += e.key;
         pbUpdateCells();
         SoundManager.pbKeyPress();
-      } else if (pb.currentInput.indexOf(e.key) !== -1) {
+      } else if (pb.currentInput.indexOf(e.key) !== -1 || pb.currentInput.length >= 4) {
         SoundManager.pbWrong();
       }
     } else if (e.key === 'Backspace') {
@@ -5144,6 +5356,8 @@ function showMFD() {
   if (play) play.classList.add('hidden');
   // Stop any in-progress bot timer
   mfdState.botTimeout && clearTimeout(mfdState.botTimeout);
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('memoryflip');
   window.scrollTo(0, 0);
 }
 
@@ -5159,6 +5373,8 @@ function showCDD() {
   var play = document.getElementById('cdd-play');
   if (home) home.classList.remove('hidden');
   if (play) play.classList.add('hidden');
+  document.body.classList.add('dz-in-game');
+  if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn('connectdots');
   window.scrollTo(0, 0);
 }
 
@@ -5183,6 +5399,7 @@ var mfdState = {
   gameOver:       false,
   totalPairs:     8,
   botTimeout:     null,
+  gen:            0,      // incremented on every new game; stale evaluate callbacks compare against this
   // Bot memory: map of cardIndex -> pairValue (for extreme bot - perfect memory)
   botMemory:      {},
   botSeenPairs:   {},     // pairValue -> [idx1, idx2] if both seen (extreme)
@@ -5341,7 +5558,8 @@ function mfdOnCardClick(idx) {
   if (mfdState.flipped.length === 2) {
     mfdState.locked = true;
     mfdUpdateActivePlayer();
-    setTimeout(mfdEvaluate, 500);
+    var _evalGen = mfdState.gen;
+    setTimeout(function() { if (mfdState.gen === _evalGen) mfdEvaluate(); }, 500);
   }
 }
 
@@ -5607,7 +5825,8 @@ function mfdExecuteBotMove() {
     mfdState.flipped.push(idx2);
     // Evaluate after 2nd flip
     mfdState.locked = true;
-    setTimeout(mfdEvaluate, 500);
+    var _botEvalGen = mfdState.gen;
+    setTimeout(function() { if (mfdState.gen === _botEvalGen) mfdEvaluate(); }, 500);
   }, 550);
 }
 
@@ -5616,6 +5835,7 @@ function mfdStartGame(preserveScores) {
   // Stop any running bot
   if (mfdState.botTimeout) { clearTimeout(mfdState.botTimeout); mfdState.botTimeout = null; }
 
+  mfdState.gen++;  // invalidate any in-flight evaluate or bot timeouts from the previous round
   mfdState.cards         = mfdBuildDeck();
   mfdState.flipped       = [];
   mfdState.scores        = preserveScores ? mfdState.scores : [0, 0];
@@ -5809,7 +6029,10 @@ var GameLoader = (function() {
     hideAllScreens();
     var el = document.getElementById(containerId);
     if (el) { el.classList.remove('hidden'); }
+    document.body.classList.add('dz-in-game');
     window.scrollTo(0, 0);
+    // Show game menu button directly — reliable vs event timing issues
+    if (window.dzShowGameMenuBtn) window.dzShowGameMenuBtn(containerId.replace('screen-',''));
   }
 
   /** Safely call a lifecycle method on a config object. */
@@ -5938,12 +6161,19 @@ var GameLoader = (function() {
     return _activeId;
   }
 
+  /** Destroy the active game WITHOUT navigating — used by dzNavShowHome which
+   *  handles its own hub transition to avoid triggering the ad interstitial twice. */
+  function destroyActive() {
+    _destroyActive();
+  }
+
   // Expose public interface
   return {
     registerGame:      registerGame,
     openGame:          openGame,
     resetCurrentGame:  resetCurrentGame,
     closeCurrentGame:  closeCurrentGame,
+    destroyActive:     destroyActive,
     getActiveGameId:   getActiveGameId
   };
 
@@ -6500,7 +6730,8 @@ var GlobalBotEngine = (function() {
     },
     reset:  function() { tttRestart(); },
     destroy: function() {
-      // TTT has no async loops; just mark board inactive
+      // Cancel any pending bot think and mark board inactive
+      if (tttBotTimeout) { clearTimeout(tttBotTimeout); tttBotTimeout = null; }
       tttActive = false;
       tttBoardEl && tttBoardEl.classList.add('disabled');
     }
@@ -6803,9 +7034,12 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     difficulty:     'easy',
     gameOver:       false,
     botThinking:    false,
-    gridSize:       3,      // 3=3x3 boxes (4x4 dots), 5=5x5 boxes, 10=10x10 boxes
     totalLines:     24,
-    drawnLines:     0
+    drawnLines:     0,
+    _botTimeout:    null,
+    _resizeHandler: null,
+    _lastDOT:       14,
+    _lastCELL:      60
   };
 
   // ── DOM Refs ────────────────────────────────────────────────
@@ -6890,20 +7124,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     }
   });
 
-  // Start game
-  // Grid Size buttons (3x3, 5x5, 10x10)
-  var cddGridBtns = document.querySelectorAll('.cdd-grid-size-btn');
-  if (cddGridBtns.length) {
-    cddGridBtns.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        cddGridBtns.forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        cdd.gridSize = parseInt(btn.dataset.gridsize, 10) || 3;
-        SoundManager.click();
-      });
-    });
-  }
-
   if (cddHpStart) {
     cddHpStart.addEventListener('click', function() {
       SoundManager.click();
@@ -6936,8 +7156,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
       GameLoader.closeCurrentGame();
     });
   }
-
-  // Result overlay buttons
   if (cddPlayAgain) {
     cddPlayAgain.addEventListener('click', function() {
       SoundManager.click();
@@ -6956,27 +7174,31 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
   function cddStartGame() {
     cddDestroyGame();
 
-    // Reset state
-    cdd.lines    = {};
-    cdd.boxes    = {};
-    cdd.scores   = {p1: 0, p2: 0};
+    cdd.lines       = {};
+    cdd.boxes       = {};
+    cdd.scores      = {p1: 0, p2: 0};
     cdd.currentTurn = 'p1';
     cdd.gameOver    = false;
     cdd.botThinking = false;
     cdd.drawnLines  = 0;
 
-    // Build data structures
     cddBuildData();
 
-    // Render grid
-    cddRenderGrid();
+    // Show panel first so layout is ready for measurement
+    cddHomePanel.classList.add('hidden');
+    cddPlayPanel.classList.remove('hidden');
+    cddResult.classList.add('hidden');
 
-    // Update UI
-    cddUpdateScores();
-    cddUpdateTurnUI();
-    cddHideResult();
+    // Render after browser has laid out the panel
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        cddRenderGrid();
+        cddUpdateScores();
+        cddUpdateTurnUI();
+        cddHideResult();
+      });
+    });
 
-    // Mode labels
     if (cddModeLabel) {
       cddModeLabel.textContent = cdd.gameMode === 'bot'
         ? 'vs Bot (' + cdd.difficulty.toUpperCase() + ')'
@@ -6986,48 +7208,39 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
       cddP2Label.textContent = cdd.gameMode === 'bot' ? 'Bot' : 'Player 2';
     }
 
-    // Show play panel
-    cddHomePanel.classList.add('hidden');
-    cddPlayPanel.classList.remove('hidden');
-    cddResult.classList.add('hidden');
-
     window.scrollTo(0, 0);
   }
 
   function cddDestroyGame() {
-    // No timers to clear except bot timeout
-    if (cdd._botTimeout) {
-      clearTimeout(cdd._botTimeout);
-      cdd._botTimeout = null;
-    }
-    cdd.gameOver = true;
+    if (cdd._botTimeout) { clearTimeout(cdd._botTimeout); cdd._botTimeout = null; }
+    cdd.gameOver    = true;
     cdd.botThinking = false;
+    // Clear grid so stale event handlers are removed
+    if (cddGrid) cddGrid.innerHTML = '';
   }
 
   // ── Data Structures ─────────────────────────────────────────
 
   function cddBuildData() {
-    var G = cdd.gridSize; // number of boxes per side
-    // Horizontal lines: h-{row}-{col}, row=0..G, col=0..G-1
-    for (var r = 0; r <= G; r++) {
-      for (var c = 0; c <= G-1; c++) {
+    // Horizontal lines: h-{row}-{col}
+    // row = 0..3 (between/around 4 dot-rows), col = 0..2 (3 gaps between 4 dot-cols)
+    for (var r = 0; r <= 3; r++) {
+      for (var c = 0; c <= 2; c++) {
         var hid = 'h-' + r + '-' + c;
         cdd.lines[hid] = {id: hid, type: 'h', row: r, col: c, isDrawn: false, owner: null};
       }
     }
-    // Vertical lines: v-{row}-{col}, row=0..G-1, col=0..G
-    for (var r = 0; r <= G-1; r++) {
-      for (var c = 0; c <= G; c++) {
+    // Vertical lines: v-{row}-{col}
+    // row = 0..2 (3 gaps), col = 0..3 (4 dot-cols)
+    for (var r = 0; r <= 2; r++) {
+      for (var c = 0; c <= 3; c++) {
         var vid = 'v-' + r + '-' + c;
         cdd.lines[vid] = {id: vid, type: 'v', row: r, col: c, isDrawn: false, owner: null};
       }
     }
-    // Update totalLines
-    cdd.totalLines = (G+1)*G + G*(G+1); // H lines + V lines
-
-    // Boxes: box-{row}-{col}, row=0..G-1, col=0..G-1
-    for (var r = 0; r <= G-1; r++) {
-      for (var c = 0; c <= G-1; c++) {
+    // Boxes: box-{row}-{col}, row=0..2, col=0..2
+    for (var r = 0; r <= 2; r++) {
+      for (var c = 0; c <= 2; c++) {
         var bid = 'box-' + r + '-' + c;
         cdd.boxes[bid] = {
           id: bid, row: r, col: c,
@@ -7042,129 +7255,114 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
         };
       }
     }
+    cdd.totalLines = Object.keys(cdd.lines).length; // 24
   }
 
-  // ── Grid Rendering ──────────────────────────────────────────
+  // ── Grid Rendering ───────────────────────────────────────────
   //
-  // Visual grid is 7×7 cells (for 4×4 dots):
-  //   visual row/col 0,2,4,6 → dot row/col 0,1,2,3
-  //   visual row/col 1,3,5   → line/box row/col 0,1,2
+  // 7×7 CSS grid for 4×4 dots / 3×3 boxes:
+  //   even indices (0,2,4,6) = dot columns/rows  (DOT px wide/tall)
+  //   odd  indices (1,3,5)   = line/box columns/rows  (CELL px wide/tall)
   //
-  // Cell types:
-  //   (even-row, even-col) → dot
-  //   (even-row, odd-col)  → h-line  lineId = h-{vi/2}-{(vj-1)/2}
-  //   (odd-row,  even-col) → v-line  lineId = v-{(vi-1)/2}-{vj/2}
-  //   (odd-row,  odd-col)  → box     boxId  = box-{(vi-1)/2}-{(vj-1)/2}
+  // Cell mapping (vi=grid-row, vj=grid-col):
+  //   (even,even) → dot
+  //   (even,odd)  → h-line  id = h-{vi/2}-{(vj-1)/2}
+  //   (odd,even)  → v-line  id = v-{(vi-1)/2}-{vj/2}
+  //   (odd,odd)   → box     id = box-{(vi-1)/2}-{(vj-1)/2}
 
   function cddRenderGrid() {
     if (!cddGrid) return;
+    // Clear existing content (removes old event listeners automatically)
     cddGrid.innerHTML = '';
     cddGrid.classList.remove('locked');
-    var G = cdd.gridSize;
-    var totalCells = (G * 2 + 1); // dots + lines alternating
 
-    // ── Compute sizes that always fit the screen ──────────────
-    // DOT: fixed small size for the dot rows/columns
-    var DOT = 10;
-    // Available width: container width minus padding (2×8px), capped at max-width
-    var availW = Math.min((cddGrid.parentElement ? cddGrid.parentElement.clientWidth - 16 : window.innerWidth - 32), 516);
-    // Available height: grid-wrap height minus padding
-    var wrapEl = document.getElementById('cdd-grid-wrap');
-    var availH = wrapEl ? wrapEl.clientHeight - 16 : availW;
-    // CELL: fit both width and height
-    var CELL_W = Math.floor((availW - (G + 1) * DOT) / G);
-    var CELL_H = Math.floor((availH - (G + 1) * DOT) / G);
-    var CELL = Math.min(CELL_W, CELL_H);
-    if (G <= 3) CELL = Math.min(CELL, 88);
-    if (G <= 5) CELL = Math.min(CELL, 68);
-    CELL = Math.max(CELL, 24);
-    // Expose sizes as CSS custom properties so CSS rules can read them
-    cddGrid.style.setProperty('--cdd-dot-sz',  DOT  + 'px');
-    cddGrid.style.setProperty('--cdd-cell-sz', CELL + 'px');
+    // Measure the container — it must be visible at this point
+    // (we always call after two rAF frames in cddStartGame)
+    var DOT = 16;  // dot cell size px
+    var wrap = document.getElementById('cdd-grid-wrap');
+    var containerW = wrap ? Math.floor(wrap.getBoundingClientRect().width) : 0;
+    if (containerW < 60) containerW = Math.min(window.innerWidth - 32, 400);
 
-    // Build alternating column/row template: DOT CELL DOT CELL ... DOT
-    var trackList = [];
-    for (var t = 0; t < totalCells; t++) {
-      trackList.push(t % 2 === 0 ? DOT + 'px' : CELL + 'px');
-    }
-    var tpl = trackList.join(' ');
+    // Grid total width = 4*DOT + 3*CELL
+    // Solve for CELL: CELL = floor((containerW - 4*DOT - 12) / 3)
+    // The -12 gives 4px padding on each side of the grid
+    var CELL = Math.floor((containerW - 4 * DOT - 12) / 3);
+    CELL = Math.max(36, Math.min(90, CELL));
+
+    var tpl = [DOT, CELL, DOT, CELL, DOT, CELL, DOT].map(function(v){ return v + 'px'; }).join(' ');
     cddGrid.style.gridTemplateColumns = tpl;
     cddGrid.style.gridTemplateRows    = tpl;
+    // Store cell size so drawLine can reference it
+    cdd._CELL = CELL;
+    cdd._DOT  = DOT;
 
-    for (var vi = 0; vi < totalCells; vi++) {
-      for (var vj = 0; vj < totalCells; vj++) {
-        var el;
-        var ri = vi % 2, rj = vj % 2; // 0=even, 1=odd
+    for (var vi = 0; vi <= 6; vi++) {
+      for (var vj = 0; vj <= 6; vj++) {
+        var cell = document.createElement('div');
+        var isEvenRow = (vi % 2 === 0);
+        var isEvenCol = (vj % 2 === 0);
 
-        if (ri === 0 && rj === 0) {
-          // DOT
-          el = document.createElement('div');
-          el.className = 'cdd-dot';
+        if (isEvenRow && isEvenCol) {
+          // ── DOT ──
+          cell.className = 'cdd-dot';
 
-        } else if (ri === 0 && rj === 1) {
-          // H-LINE
-          var dotRow = vi / 2;
-          var dotCol = (vj - 1) / 2;
-          var lid = 'h-' + dotRow + '-' + dotCol;
-          el = document.createElement('div');
-          el.className = 'cdd-line h-line';
-          el.setAttribute('data-lineid', lid);
-          el.setAttribute('tabindex', '0');
-          el.setAttribute('role', 'button');
-          el.setAttribute('aria-label', 'Horizontal line row ' + dotRow + ' col ' + dotCol);
-          cddSetLineClickHandler(el, lid);
+        } else if (isEvenRow && !isEvenCol) {
+          // ── HORIZONTAL LINE ──
+          var lid = 'h-' + (vi / 2) + '-' + ((vj - 1) / 2);
+          cell.className = 'cdd-cell-hline';
+          cell.setAttribute('data-lineid', lid);
+          // Visual bar as a real child div (no pseudo-elements = reliable clicks)
+          var bar = document.createElement('div');
+          bar.className = 'cdd-bar-h';
+          bar.setAttribute('data-lineid', lid);
+          cell.appendChild(bar);
+          // Click on the entire cell area
+          (function(lineId, cellEl, barEl) {
+            cellEl.addEventListener('click', function() { cddOnLineClick(lineId); });
+            cellEl.addEventListener('touchend', function(e) {
+              e.preventDefault();
+              cddOnLineClick(lineId);
+            }, {passive: false});
+          })(lid, cell, bar);
 
-        } else if (ri === 1 && rj === 0) {
-          // V-LINE
-          var dotRow = (vi - 1) / 2;
-          var dotCol = vj / 2;
-          var lid = 'v-' + dotRow + '-' + dotCol;
-          el = document.createElement('div');
-          el.className = 'cdd-line v-line';
-          el.setAttribute('data-lineid', lid);
-          el.setAttribute('tabindex', '0');
-          el.setAttribute('role', 'button');
-          el.setAttribute('aria-label', 'Vertical line row ' + dotRow + ' col ' + dotCol);
-          cddSetLineClickHandler(el, lid);
+        } else if (!isEvenRow && isEvenCol) {
+          // ── VERTICAL LINE ──
+          var lid = 'v-' + ((vi - 1) / 2) + '-' + (vj / 2);
+          cell.className = 'cdd-cell-vline';
+          cell.setAttribute('data-lineid', lid);
+          var bar = document.createElement('div');
+          bar.className = 'cdd-bar-v';
+          bar.setAttribute('data-lineid', lid);
+          cell.appendChild(bar);
+          (function(lineId, cellEl) {
+            cellEl.addEventListener('click', function() { cddOnLineClick(lineId); });
+            cellEl.addEventListener('touchend', function(e) {
+              e.preventDefault();
+              cddOnLineClick(lineId);
+            }, {passive: false});
+          })(lid, cell);
 
         } else {
-          // BOX
-          var boxRow = (vi - 1) / 2;
-          var boxCol = (vj - 1) / 2;
-          var bid = 'box-' + boxRow + '-' + boxCol;
-          el = document.createElement('div');
-          el.className = 'cdd-box';
-          el.setAttribute('data-boxid', bid);
+          // ── BOX ──
+          var bid = 'box-' + ((vi - 1) / 2) + '-' + ((vj - 1) / 2);
+          cell.className = 'cdd-cell-box';
+          cell.setAttribute('data-boxid', bid);
           var lbl = document.createElement('span');
           lbl.className = 'cdd-box-label';
-          lbl.textContent = 'P1';
-          el.appendChild(lbl);
+          cell.appendChild(lbl);
         }
 
-        cddGrid.appendChild(el);
+        cddGrid.appendChild(cell);
       }
     }
   }
 
-  function cddSetLineClickHandler(el, lid) {
-    // touchend fires before click — handle it and flag so click doesn't double-fire
-    var _touchFired = false;
-    el.addEventListener('touchend', function(e) {
-      e.preventDefault(); // prevent synthesised mouse click
-      _touchFired = true;
-      cddOnLineClick(lid);
-      setTimeout(function() { _touchFired = false; }, 500);
-    }, { passive: false });
-    el.addEventListener('click', function() {
-      if (_touchFired) return; // already handled by touchend
-      cddOnLineClick(lid);
-    });
-    el.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        cddOnLineClick(lid);
-      }
-    });
+  // ── Look up a line's DOM cell and bar by lineId ─────────────
+  function cddGetLineEls(lid) {
+    if (!cddGrid) return {cell: null, bar: null};
+    var cell = cddGrid.querySelector('[data-lineid="' + lid + '"].cdd-cell-hline, [data-lineid="' + lid + '"].cdd-cell-vline');
+    var bar  = cell ? cell.querySelector('[data-lineid="' + lid + '"]') : null;
+    return {cell: cell, bar: bar};
   }
 
   // ── Turn Logic ───────────────────────────────────────────────
@@ -7183,45 +7381,39 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     var line = cdd.lines[lid];
     if (!line || line.isDrawn) return;
 
-    // Mark line
     line.isDrawn = true;
     line.owner   = player;
     cdd.drawnLines++;
 
-    // Update DOM for the line
-    var el = cddGrid ? cddGrid.querySelector('[data-lineid="' + lid + '"]') : null;
-    if (el) {
-      el.classList.add('drawn');
-      el.classList.add(player === 'p1' ? 'drawn-p1' : 'drawn-p2');
-      el.classList.add('line-just-drawn');
-      SoundManager.click();
-      setTimeout(function() { if (el) el.classList.remove('line-just-drawn'); }, 400);
+    // Update DOM — target the cell div and its bar child
+    if (cddGrid) {
+      var cell = cddGrid.querySelector('[data-lineid="' + lid + '"]');
+      if (cell) {
+        var cls = player === 'p1' ? 'drawn-p1' : 'drawn-p2';
+        cell.classList.add('drawn', cls);
+        var bar = cell.querySelector('.cdd-bar-h, .cdd-bar-v');
+        if (bar) bar.classList.add('bar-drawn', cls);
+        SoundManager.click();
+      }
     }
 
-    // Check box completion
     var boxesClaimed = cddCheckBoxes(player);
 
-    // ── Check game over FIRST, before any turn-switch or bot schedule ──
     if (cdd.drawnLines >= cdd.totalLines) {
-      if (boxesClaimed > 0) cddUpdateScores(); // commit final box claims to display
+      cddUpdateScores();
       cddEndGame();
       return;
     }
 
     if (boxesClaimed > 0) {
-      // Player keeps turn (claimed at least one box)
       cddUpdateScores();
       if (cdd.gameOver) return;
-      SoundManager.gameStart(); // box completion sound
+      SoundManager.gameStart();
       cddUpdateTurnUI();
-      // If bot's extra turn
-      if (cdd.gameMode === 'bot' && cdd.currentTurn === 'p2') {
-        cddScheduleBotMove();
-      }
+      if (cdd.gameMode === 'bot' && cdd.currentTurn === 'p2') cddScheduleBotMove();
     } else {
-      // Switch turn
       cddSwitchTurn();
-      SoundManager.tttMove(); // line draw / turn switch sound
+      SoundManager.tttMove();
     }
   }
 
@@ -7252,8 +7444,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     if (!cddGrid) return;
     var el = cddGrid.querySelector('[data-boxid="' + bid + '"]');
     if (!el) return;
-    el.classList.add('completed-' + player);
-    el.classList.add('cdd-box-just-claimed');
+    el.classList.add('completed-' + player, 'cdd-box-just-claimed');
     var lbl = el.querySelector('.cdd-box-label');
     if (lbl) {
       lbl.textContent = cdd.gameMode === 'bot'
@@ -7412,7 +7603,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
 
   // ── Register GlobalBotEngine strategy ────────────────────────
 
-  GlobalBotEngine.registerStrategy('connectdots', function(difficulty, state, mem) {
+  GlobalBotEngine._strategies['connectdots'] = function(difficulty, state, mem) {
     var available = state.availableLines;
     if (!available || !available.length) return null;
 
@@ -7513,7 +7704,7 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     });
 
     return bestLine || available[Math.floor(Math.random() * available.length)];
-  });
+  };
 
   // ── GameLoader Registration ───────────────────────────────────
 
@@ -7522,27 +7713,6 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
     containerId: 'screen-connectdots',
     init: function() {
       // All wiring is done at parse time above
-      // Re-render grid on resize/orientation change
-      window.addEventListener('resize', function() {
-        if (!cdd.gameOver && document.getElementById('cdd-play') && !document.getElementById('cdd-play').classList.contains('hidden')) {
-          cddRenderGrid();
-          // Restore drawn lines and completed boxes visually
-          Object.keys(cdd.lines).forEach(function(lid) {
-            var ln = cdd.lines[lid];
-            if (!ln.isDrawn) return;
-            var el = cddGrid && cddGrid.querySelector('[data-lineid="' + lid + '"]');
-            if (el) {
-              el.classList.add('drawn');
-              el.classList.add(ln.owner === 'p1' ? 'drawn-p1' : 'drawn-p2');
-            }
-          });
-          Object.keys(cdd.boxes).forEach(function(bid) {
-            var box = cdd.boxes[bid];
-            if (!box.isCompleted) return;
-            cddAnimateBox(bid, box.owner);
-          });
-        }
-      });
     },
     start: function() {
       // Show home/setup panel
@@ -7556,6 +7726,10 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
       cddDestroyGame();
     }
   });
+
+  // Expose destroy globally so dzPauseAllGames() can cancel the bot timer
+  // even though cdd lives inside this IIFE closure
+  window.cddDestroyGame = cddDestroyGame;
 
   console.log('[DuelZone] Connect Dots Duel loaded and registered.');
 
@@ -7731,6 +7905,170 @@ console.log('[DuelZone] Global Systems (GameLoader + GlobalBotEngine) v1.0 loade
 
 var _dzMenuOpen = false;
 
+// ═══════════════════════════════════════════════════════════
+// CENTRAL GAME STOP / PAUSE
+// ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// GAME PAUSE / RESUME
+//
+// dzPauseAllGames()  — freezes every running game. Called when
+//   the in-game menu opens OR when navigating away.
+//
+// dzResumeAllGames() — resumes every game that was paused.
+//   Called when the menu closes while still in the same game.
+//
+// dzStopAllGames()   — full teardown. Called when navigating
+//   back to the hub (state is discarded).
+// ═══════════════════════════════════════════════════════════
+
+function dzPauseAllGames() {
+  // ── 1. SILENCE ALL AUDIO IMMEDIATELY ──────────────────────────
+  dzSuspendAllAudio();
+
+  // ── 2. SET GLOBAL PAUSE FLAG ──────────────────────────────────
+  // External RAF loops guard themselves with: if (window.DZ_PAUSED) return;
+  window.DZ_PAUSED = true;
+
+  // ── 3. PAUSE INTERNAL GAMES (defined in this file) ────────────
+
+  // Air Hockey — dedicated pause flag stops physics + sound
+  if (typeof ahRunning !== 'undefined' && ahRunning) {
+    ahPaused = true;
+    var pauseBtn = document.getElementById('ah-pause-btn');
+    if (pauseBtn) pauseBtn.textContent = '▶';
+  }
+
+  // Tap Battle — stop bot interval + countdown timer
+  if (typeof tapStop === 'function') tapStop();
+
+  // 2048 Duel — stop bot timer
+  if (typeof d2048BotTimer !== 'undefined') {
+    clearInterval(d2048BotTimer); clearTimeout(d2048BotTimer); d2048BotTimer = null;
+  }
+
+  // Hand Cricket — lock numpad so no delayed bot callback fires
+  if (typeof cricNumpadLocked !== 'undefined') cricNumpadLocked = true;
+
+  // Memory Flip — cancel bot move timeout
+  if (typeof mfdState !== 'undefined' && mfdState) {
+    if (mfdState.botTimeout) { clearTimeout(mfdState.botTimeout); mfdState.botTimeout = null; }
+    mfdState.locked = true;
+  }
+
+  // Connect Dots — cancel bot timeout
+  if (typeof window.cddDestroyGame === 'function') {
+    window.cddDestroyGame();
+  }
+
+  // Password Breaker — pause countdown timer
+  if (typeof pb !== 'undefined' && pb && pb.timerInterval) {
+    clearInterval(pb.timerInterval); pb.timerInterval = null;
+  }
+
+  // ── 4. CALL KNOWN EXTERNAL PAUSE FUNCTIONS ─────────────────────
+  var _safeTry = function(fn) { try { if (typeof fn === 'function') fn(); } catch(e) {} };
+  _safeTry(window.ppPause);
+  _safeTry(window.tetrisPause);
+  _safeTry(window.reactionPause);  // pauses timers WITHOUT setting RD.over=true
+  _safeTry(window.territoryDestroy);
+  _safeTry(window.sdStopGame);
+  _safeTry(window.mineDestroy);
+  _safeTry(window.bombermanDestroy);
+  _safeTry(window.carromStop);
+  _safeTry(window.sudokuPause);
+  _safeTry(window.ludomStop);
+  _safeTry(tanksDestroy);
+  _safeTry(scDestroy);
+}
+
+function dzResumeAllGames() {
+  // ── 1. RESTORE AUDIO FIRST (async, but kick it immediately) ───
+  dzResumeAllAudio();
+
+  // ── 2. CLEAR GLOBAL PAUSE FLAG ────────────────────────────────
+  window.DZ_PAUSED = false;
+
+  // ── 3. RESUME INTERNAL GAMES ──────────────────────────────────
+
+  // Air Hockey — clear pause flag; RAF loop still running, draws idle frame
+  if (typeof ahRunning !== 'undefined' && ahRunning && typeof ahPaused !== 'undefined') {
+    ahPaused = false;
+    var pauseBtn = document.getElementById('ah-pause-btn');
+    if (pauseBtn) pauseBtn.textContent = '⏸';
+  }
+
+  // Hand Cricket — unlock numpad
+  if (typeof cricNumpadLocked !== 'undefined') cricNumpadLocked = false;
+
+  // Memory Flip — unlock board (only if game not over)
+  if (typeof mfdState !== 'undefined' && mfdState && !mfdState.gameOver) {
+    mfdState.locked = false;
+    if (mfdState.mode === 'pvb' && mfdState.currentPlayer === 1 && mfdState.flipped.length === 0) {
+      if (typeof mfdScheduleBotMove === 'function') mfdScheduleBotMove();
+    }
+  }
+
+  // Password Breaker — restart countdown timer if session active
+  if (typeof pb !== 'undefined' && pb && !pb.sessionOver && typeof pbStartTimer === 'function') {
+    var pbPlayEl = document.getElementById('pb-play-panel');
+    if (pbPlayEl && !pbPlayEl.classList.contains('hidden')) pbStartTimer();
+  }
+
+  // 2048 Duel sim mode — restart bot setInterval (cleared by dzPauseAllGames)
+  if (typeof d2048Mode !== 'undefined' && d2048Mode === 'sim' &&
+      typeof d2048Active !== 'undefined' && d2048Active[1] &&
+      typeof d2048BotTimer !== 'undefined' && !d2048BotTimer) {
+    if (screen2048 && !screen2048.classList.contains('hidden')) {
+      if (typeof d2048StartSimBot === 'function') d2048StartSimBot();
+    }
+  }
+
+  // ── 4. CALL KNOWN EXTERNAL RESUME FUNCTIONS ───────────────────
+  var _safeTry = function(fn) { try { if (typeof fn === 'function') fn(); } catch(e) {} };
+  _safeTry(window.ppResume);
+  _safeTry(window.tetrisResume);
+  _safeTry(window.reactionResume);
+  _safeTry(window.sudokuResume);
+  _safeTry(window.ludomResume);
+}
+
+function dzStopAllGames() {
+  // Full stop — pause everything then also kill the Air Hockey RAF loop
+  dzPauseAllGames();
+
+  // ── CRITICAL: reset the global pause flag and audio ──────────
+  // dzPauseAllGames() sets DZ_PAUSED=true (correct for menu-open).
+  // dzStopAllGames() is also called during game-to-game navigation,
+  // so we must clear DZ_PAUSED immediately or the incoming game's
+  // RAF loop hits `if (window.DZ_PAUSED) return` and never runs.
+  window.DZ_PAUSED = false;
+  dzResumeAllAudio();
+
+  // Air Hockey: stop RAF loop entirely (not just paused flag)
+  if (typeof ahStopLoop === 'function') ahStopLoop();
+  // Reset AH pause flag so next session starts clean
+  if (typeof ahPaused !== 'undefined') ahPaused = false;
+
+  // Cricket: unlock numpad for next fresh session
+  if (typeof cricNumpadLocked !== 'undefined') cricNumpadLocked = false;
+
+  // Memory Flip: mark game over so no callbacks fire
+  if (typeof mfdState !== 'undefined' && mfdState) {
+    mfdState.gameOver = true; mfdState.locked = true;
+  }
+
+  // Reaction Duel: full stop — sets RD.over=true so no callbacks fire on next game
+  var _safeTry = function(fn) { try { if (typeof fn === 'function') fn(); } catch(e) {} };
+  _safeTry(window.rdStop);
+  _safeTry(window.reactionStop);
+
+  // Ping-pong: full stop (not just pause)
+  _safeTry(window.ppStop);
+
+  // Password Breaker: mark session over
+  if (typeof pb !== 'undefined' && pb) pb.sessionOver = true;
+}
+
 function dzToggleMenu() {
   _dzMenuOpen ? dzCloseMenu() : dzOpenMenu();
 }
@@ -7745,6 +8083,8 @@ function dzOpenMenu() {
   if (drop) drop.classList.add('open');
   if (drop) drop.setAttribute('aria-hidden', 'false');
   if (bk)   bk.classList.add('active');
+  // Pause every running game so no sound/movement bleeds through while menu is open
+  dzPauseAllGames();
 }
 
 function dzCloseMenu() {
@@ -7757,6 +8097,12 @@ function dzCloseMenu() {
   if (drop) drop.classList.remove('open');
   if (drop) drop.setAttribute('aria-hidden', 'true');
   if (bk)   bk.classList.remove('active');
+  // Resume the game only if we are still inside a game screen (not navigating to hub)
+  var hub = document.getElementById('screen-hub');
+  var onHub = hub && !hub.classList.contains('hidden');
+  if (!onHub) {
+    dzResumeAllGames();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -7768,17 +8114,18 @@ function dzGoHome() {
   dzCloseMenu();
   dzClosePanels();
   dzCloseAllLegal();
+  // Remove dz-in-game FIRST so CSS :has() sees correct state
+  document.body.classList.remove('dz-in-game');
+  // Clear game menu btn inline style so it hides on hub
+  var igBtn = document.getElementById('dz-ig-menu-btn');
+  if (igBtn) igBtn.style.removeProperty('display');
   // If a game screen is active, navigate back to hub
   var hub = document.getElementById('screen-hub');
   if (hub && hub.classList.contains('hidden')) {
-    // Find and click the back button of whatever game is showing,
-    // or directly show hub + hide all game screens
-    document.querySelectorAll('[id^="screen-"]').forEach(function(s) {
+    _getAllScreenEls().forEach(function(s) {
       s.classList.add('hidden');
     });
-    hub.classList.remove('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  } else {
+    hub.classList.remove('hidden'); // FIX 2: hub was never shown — produced a blank page
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   _dzSetDropdownActive('dd-home-btn');
@@ -7788,24 +8135,21 @@ function dzNavShowHome() {
   dzCloseMenu();
   dzClosePanels();
 
-  // ── Stop every game that could be running in the background ──
-  ahStopLoop();
-  if (typeof window.mineDestroy      === 'function') window.mineDestroy();
-  if (typeof window.tetrisDestroy    === 'function') window.tetrisDestroy();
-  if (typeof window.bombermanDestroy === 'function') window.bombermanDestroy();
-  if (typeof window.reactionDestroy  === 'function') window.reactionDestroy();
-  if (typeof window.territoryDestroy === 'function') window.territoryDestroy();
-  if (typeof tanksDestroy            === 'function') tanksDestroy();
-  if (typeof scDestroy               === 'function') scDestroy();
+  // ── FIX: single call stops every game loop, timer, and sound ──
+  dzStopAllGames();
+
+  // Notify GameLoader that no game is active — but do NOT call closeCurrentGame()
+  // because that calls showHub() again (triggering a second ad interstitial).
+  // We only need to run the active game's destroy() for cleanup.
   if (typeof GameLoader !== 'undefined' && GameLoader.getActiveGameId && GameLoader.getActiveGameId()) {
-    if (typeof GameLoader.closeCurrentGame === 'function') GameLoader.closeCurrentGame();
+    if (typeof GameLoader.destroyActive === 'function') GameLoader.destroyActive();
   }
 
   // ── Force-hide ALL fixed play panels (position:fixed escapes parent hide) ──
   ['mine-play','tetris-play','bm-play','rd-play',
    'tw-play','sdk-play','carrom-play','ludo-play'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.classList.add('hidden');
+    if (el) { el.classList.add('hidden'); el.style.setProperty('display','none','important'); }
   });
 
   // ── Hide all floating back buttons ──
@@ -7819,8 +8163,14 @@ function dzNavShowHome() {
   document.body.style.overflow = '';
   document.body.style.overscrollBehavior = '';
 
+  // ── Remove dz-in-game FIRST so CSS :has() selector sees correct state ──
+  document.body.classList.remove('dz-in-game');
+  // Clear inline style set by dzShowGameMenuBtn
+  var igBtn = document.getElementById('dz-ig-menu-btn');
+  if (igBtn) igBtn.style.removeProperty('display');
+
   // ── Show hub ──
-  document.querySelectorAll('[id^="screen-"]').forEach(function(s) {
+  _getAllScreenEls().forEach(function(s) {
     s.classList.add('hidden');
   });
   var hub = document.getElementById('screen-hub');
@@ -8099,7 +8449,7 @@ function dzToggleMusicFromMenu() {
   if (btn)    btn.classList.toggle('muted', isMuted);
   // Update wave paths on icon
   if (icon) {
-    var wavePath = icon.getElementById ? icon.getElementById('dd-music-waves') : document.getElementById('dd-music-waves');
+    var wavePath = document.getElementById('dd-music-waves'); // FIX 3: icon.getElementById is always undefined on DOM elements; use document directly
     if (wavePath) wavePath.setAttribute('d', isMuted ? '' : 'M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07');
   }
 }
@@ -8109,7 +8459,14 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     dzCloseAllLegal();
     dzClosePanels();
-    dzCloseMenu();
+    dzCloseMenu(); // dzCloseMenu already resumes audio if staying in a game
   }
 });
+
+// Expose all helpers globally so inline scripts in index.html can reach them
+window.dzPauseAllGames   = dzPauseAllGames;
+window.dzResumeAllGames  = dzResumeAllGames;
+window.dzStopAllGames    = dzStopAllGames;
+window.dzSuspendAllAudio = dzSuspendAllAudio;
+window.dzResumeAllAudio  = dzResumeAllAudio;
 

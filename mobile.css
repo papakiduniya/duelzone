@@ -65,6 +65,7 @@
 #dz-univ-game-title {
   order: 2 !important;
   flex: 1 !important;
+  min-width: 0 !important;
   text-align: center !important;
   overflow: hidden !important;
   white-space: nowrap !important;
@@ -121,6 +122,7 @@
   text-transform: uppercase;
   text-align: center;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -168,7 +170,9 @@
   align-items: stretch;
   justify-content: flex-start;
   width: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   position: relative;
   min-height: 0;
 }
@@ -246,20 +250,6 @@
   z-index: 200;
 }
 
-/* ── Rotate prompt polish + animation ────────────────────────── */
-#dz-rotate-prompt {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@keyframes dzSpin {
-  0%   { transform: rotate(0deg); }
-  15%  { transform: rotate(-25deg); }
-  50%  { transform: rotate(25deg); }
-  85%  { transform: rotate(-15deg); }
-  100% { transform: rotate(0deg); }
-}
-
 
 /* ══════════════════════════════════════════════════════════════
    § 3  CORE MOBILE  (≤ 768px)
@@ -299,7 +289,9 @@
   /* ── Hub screen ──────────────────────────────────────────────── */
 
   #screen-hub {
-    padding: 36px 16px 32px;
+    /* BUG 1 FIX: was 36px — hamburger is top:14px + h:44px = 58px bottom edge;
+       +14px breathing gap = 72px minimum clearance needed */
+    padding: 72px 16px 32px;
     gap: 24px;
     overflow-x: hidden;
     width: 100%;
@@ -318,8 +310,8 @@
   .hamburger-btn {
     position: fixed !important;
     top: 14px !important;
-    left: 14px !important;
-    right: auto !important;
+    right: 14px !important;
+    left: auto !important;
     z-index: 9999 !important;
     display: flex !important;
     visibility: visible !important;
@@ -465,12 +457,10 @@
     max-width: 100%;
     box-sizing: border-box;
     overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    /* Use dynamic viewport height for correct calc on notch phones */
-    max-height: 100dvh;
-    /* Fallback for browsers without dvh */
+    -webkit-overflow-scrolling: touch;
+    /* Fallback for browsers without dvh support */
     max-height: 100vh;
+    /* Override with dynamic viewport height on notch phones (clips address bar) */
     max-height: 100dvh;
   }
 
@@ -684,7 +674,8 @@
   /* ── Hub ──────────────────────────────────────────────────────── */
 
   #screen-hub {
-    padding: 24px 12px 24px;
+    /* BUG 2 FIX: was 24px — even worse than §3; hamburger still clips the header */
+    padding: 72px 12px 24px;
     gap: 16px;
   }
 
@@ -764,7 +755,7 @@
 
   #mine-flag-p1,
   #mine-flag-p2 {
-    min-height: 42px;
+    min-height: 44px;
     font-size: 0.85rem;
   }
 
@@ -914,149 +905,138 @@
 /* end @media 360px */
 
 
+
+
 /* ══════════════════════════════════════════════════════════════
-   § 6  LANDSCAPE PHONE  (short viewport, wide orientation)
-        Targets: max-height 500px + landscape orientation
+   § 7  PORTRAIT PHONE GAME LAYOUTS
+        BUG 4+5 FIX: was only Tetris + Bomberman. All canvas-heavy
+        games now have proper portrait/vertical layout rules:
+        column flex wrappers, 100%-width canvases capped at ~56dvh,
+        and controls pinned below the canvas.
    ══════════════════════════════════════════════════════════════ */
 
-@media screen and (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 768px) and (orientation: portrait) {
 
-  /* Topbar goes ultra compact */
-  #dz-universal-topbar {
-    padding: 4px 10px !important;
-    min-height: 40px !important;
+  /* ── All portrait canvases: full-width, proportional, height-capped ── */
+  #tanks-canvas,
+  #bm-canvas,
+  #sc-canvas,
+  #sd-canvas,
+  #pp-canvas,
+  #ping-canvas,
+  #territory-canvas,
+  #checkers-canvas,
+  #carrom-canvas,
+  #ludo-canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    /* Cap canvas height so HUD + controls always stay on screen */
+    max-height: 56dvh !important;
+    display: block !important;
+    margin: 0 auto !important;
+    object-fit: contain !important;
   }
 
-  .dz-univ-back-btn,
-  .dz-univ-fs-btn {
-    min-height: 36px !important;
-    padding: 4px 12px !important;
-    font-size: 0.75rem;
-  }
-
-  #dz-universal-controls {
-    padding: 4px 8px 8px;
-  }
-
-  .dz-dpad-btn {
-    width: 42px;
-    height: 42px;
-    font-size: 1rem;
-  }
-
-  .dz-action-btn {
-    height: 42px;
-    font-size: 0.75rem;
-  }
-
-  .game-home-panel,
-  .ghp-v2 {
-    padding: 8px 12px 12px;
-    gap: 8px;
-  }
-
-  #screen-hub {
-    padding: 16px 12px;
-    gap: 12px;
-  }
-
-  /* Game play panels: remove vertical padding to maximize canvas */
+  /* ── Play panel wrappers: vertical column layout ── */
   #tanks-play-panel,
   #sd-play-panel,
   #sc-play-panel,
   #bm-play,
   #pp-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    min-height: 100dvh !important;
+    width: 100% !important;
     padding: 0 !important;
-    min-height: 100dvh;
-    justify-content: flex-start;
+    box-sizing: border-box !important;
   }
 
-  /* HUDs: ultra compact */
+  /* ── HUDs: full-width compact strip above canvas ── */
   #tanks-hud,
   #sd-hud,
   #sc-hud {
-    padding: 3px 8px !important;
-    min-height: 28px;
+    width: 100% !important;
+    padding: 4px 8px !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+    min-height: 36px !important;
   }
 
-  /* HP bars: narrower */
-  #tanks-hud [style*="width:100px"],
-  #sd-p1-hp-bar,
-  #sd-p2-hp-bar {
-    width: 64px !important;
+  /* ── Controls: full-width row pinned below canvas ── */
+  #tanks-mobile-controls,
+  #bm-mobile-controls,
+  #sd-joystick-wrap,
+  #pp-mobile-controls,
+  #tetris-mobile-controls,
+  #snake-mobile-controls {
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    padding: 6px 4px 10px !important;
+    box-sizing: border-box !important;
   }
 
-  /* Canvas: max available height in landscape */
-  #tanks-canvas,
-  #sd-canvas,
-  #sc-canvas,
-  #bm-canvas,
-  #pp-canvas {
-    max-height: calc(100dvh - 72px);
-    width: auto !important;
-    max-width: 100%;
-    object-fit: contain;
-  }
-
-  /* Tetris: tighter padding */
+  /* ── Tetris: stack the two player panels vertically ── */
   #tetris-play {
-    padding: 4px 8px !important;
-  }
-
-  /* Tanks controls: compact row */
-  #tanks-mobile-controls {
-    padding: 4px 8px !important;
-    gap: 8px;
-  }
-
-  /* Bomberman canvas wrapper */
-  #bm-play > div:first-child {
-    padding: 4px 8px !important;
-  }
-
-}
-/* end landscape 500px */
-
-
-/* ══════════════════════════════════════════════════════════════
-   § 7  PORTRAIT-SPECIFIC GAME RULES
-   ══════════════════════════════════════════════════════════════ */
-
-/* Tetris: stack panels vertically on portrait phones */
-@media (max-width: 640px) and (orientation: portrait) {
-
-  #tetris-play {
-    flex-direction: column;
-    align-items: center;
-    padding: 6px 4px;
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 6px 4px !important;
   }
 
   #tetris-player-1,
   #tetris-player-2 {
     width: 100% !important;
-    max-width: 220px;
-    margin: 0 auto;
+    max-width: 220px !important;
+    margin: 0 auto !important;
   }
 
-}
-
-/* Bomberman: canvas centered with breathing room */
-@media (max-width: 560px) {
-
+  /* ── Bomberman: centered canvas ── */
   #bm-canvas {
-    display: block;
-    margin: 0 auto;
+    display: block !important;
+    margin: 0 auto !important;
   }
 
-  #bm-play {
-    padding: 6px 4px !important;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100dvh;
+  /* ── PingPong: canvas fills width, caps height ── */
+  #pp-canvas-wrap {
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  #pp-canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 50dvh !important;
+  }
+
+  /* ── StarCatcher: no wasted top padding ── */
+  #sc-play-panel {
+    padding: 0 !important;
+  }
+
+  /* ── Checkers: column stack in portrait ── */
+  #ck-game-area {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  /* ── Battleship: stack placement + attack grids vertically ── */
+  #bs-game-area,
+  .bs-grids-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  #bs-placement-grid,
+  #bs-attack-grid {
+    max-width: min(90vw, 340px) !important;
+    margin: 0 auto !important;
   }
 
 }
+
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -1086,12 +1066,15 @@
     #dz-hamburger,
     .hamburger-btn {
       top: calc(14px + env(safe-area-inset-top)) !important;
-      left: calc(14px + env(safe-area-inset-left)) !important;
-      right: auto !important;
+      right: calc(14px + env(safe-area-inset-right)) !important;
     }
 
-    /* Hub screen bottom padding accounts for home indicator */
+    /* Hub screen accounts for home indicator + notch */
     #screen-hub {
+      /* BUG 3 FIX: safe-area block only fixed padding-bottom; on notch phones the
+         hamburger shifts down by env(safe-area-inset-top) so hub needs the same
+         extra offset on top to keep content clear of both notch and hamburger */
+      padding-top: calc(72px + env(safe-area-inset-top));
       padding-bottom: calc(32px + env(safe-area-inset-bottom));
     }
 
@@ -1138,57 +1121,991 @@
 
 }
 
+
 /* ══════════════════════════════════════════════════════════════
-   § TETRIS DUEL — Landscape mobile overflow fix
-   Constrain each player column so both fit side-by-side within
-   the viewport without overflowing or clipping off-screen.
+   § 10  PORTRAIT LOCK — hard overlay + body freeze
+         Fires for any touch device in landscape orientation.
+         JS also calls screen.orientation.lock('portrait');
+         this CSS is the fallback when that API is unavailable.
    ══════════════════════════════════════════════════════════════ */
-@media (orientation: landscape) and (max-height: 540px) {
 
-  #tetris-play {
-    padding: 2px 6px 4px !important;
-    overflow-y: auto;
+/* ── Portrait-only lock: overlay hidden in portrait, shown in landscape ──
+   Pure CSS — no JS class toggle needed. Works even if JS is slow/blocked.
+   The #dz-portrait-lock element is always in the DOM; CSS shows/hides it. */
+
+/* #dz-portrait-lock removed — landscape is now allowed, hub scrolls freely */
+
+/* ── Landscape: no overlay, no scroll block. Hub is fully scrollable.
+   Only game panels with .hidden are hidden; active games show in landscape. ── */
+@media (orientation: landscape) {
+
+  /* Only hide game screens that have the .hidden class.
+     Active (non-hidden) game screens are now allowed in landscape. */
+  [id^="screen-"]:not(#screen-hub).hidden {
+    display: none !important;
+    visibility: hidden !important;
   }
 
-  /* The outer flex row that holds both player columns */
-  #tetris-play > div:not(.dz-topbar):not([style*="text-align:center"]) {
+  /* Fixed game panels: only hide when .hidden class is present */
+  #tetris-play.hidden,
+  [data-dz-game-panel].hidden {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  /* Canvases in .hidden screens stay invisible */
+  [id^="screen-"].hidden canvas {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+.dz-pl-icon {
+  font-size: 3.5rem;
+  animation: dzPlSpin 2s ease-in-out infinite;
+}
+
+@keyframes dzPlSpin {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-30deg); }
+  50%  { transform: rotate(90deg); }
+  80%  { transform: rotate(60deg); }
+  100% { transform: rotate(90deg); }
+}
+
+.dz-pl-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(0.9rem, 4vw, 1.1rem);
+  font-weight: 900;
+  color: #00e5ff;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dz-pl-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(0.78rem, 3vw, 0.9rem);
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  max-width: 280px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 11  TETRIS PORTRAIT LAYOUT FIX + LANDSCAPE HARD HIDE
+         BUG FIX: tetris-play used inline flex-wrap row which
+         caused side-by-side layout visible in landscape screenshots.
+         Also: position:fixed panels escape overflow:hidden, so we
+         must explicitly hide them in landscape via CSS too.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Tetris: force vertical column for the players wrapper ── */
+@media (max-width: 768px) and (orientation: portrait) {
+
+  /* Override the inline style "display:flex; flex-wrap:wrap; justify-content:center"
+     on #tetris-players-wrap to stack players vertically */
+  #tetris-players-wrap {
+    flex-direction: column !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 20px !important;
     flex-wrap: nowrap !important;
-    gap: 8px !important;
-    align-items: flex-start;
-    width: 100%;
-    overflow-x: hidden;
   }
 
-  /* Each player column — split viewport 50/50 minus gap */
-  #tetris-play > div:not(.dz-topbar):not([style*="text-align:center"]) > div {
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: calc(50vw - 10px) !important;
+  /* Each player panel fills container */
+  #tetris-players-wrap > div {
+    width: 100% !important;
+    max-width: 280px !important;
+    margin: 0 auto !important;
   }
 
-  /* Canvases scale down to fill their column */
+  /* Tetris canvases: full-width, proportional height */
   #tetris-canvas-p1,
   #tetris-canvas-p2 {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 280px !important;
     height: auto !important;
-  }
-
-  /* Next-piece preview — keep small */
-  #tetris-next-p1,
-  #tetris-next-p2 {
-    max-width: 52px !important;
-    height: auto !important;
-  }
-
-  /* Compact heading */
-  #tetris-play h1 {
-    font-size: 0.8rem !important;
-    margin-bottom: 4px !important;
-  }
-
-  /* Shrink score row text */
-  #tetris-play [style*="Score:"] {
-    font-size: 0.65rem !important;
+    display: block !important;
   }
 }
+
+/* ── CRITICAL: In landscape, force-hide tetris-play and all fixed game panels ──
+   position:fixed elements escape display:none on parents — must be hidden directly.
+   max-width guard is mandatory here: without it this fires on desktop landscape too. */
+@media (orientation: landscape) and (max-width: 768px) {
+
+  #tetris-play,
+  [data-dz-game-panel] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 12  FIXED GAME PANEL HARD HIDE
+         tetris-play, rd-play, carrom-play, sdk-play are
+         position:fixed and escape parent display:none.
+         When they have .hidden they must ALWAYS be display:none.
+         This rule has maximum specificity and overrides everything.
+   ══════════════════════════════════════════════════════════════ */
+
+html body #tetris-play.hidden,
+html body #rd-play.hidden,
+html body #carrom-play.hidden,
+html body #sdk-play.hidden,
+html body [data-dz-game-panel].hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 13  LANDSCAPE (HORIZONTAL) GAME LAYOUTS
+         Makes all games playable in horizontal/landscape view.
+         Applies to touch devices in landscape orientation.
+   ══════════════════════════════════════════════════════════════ */
+
+@media (orientation: landscape) and (max-height: 600px) {
+
+  /* ── Shared: game screens fill full viewport ── */
+  [id^="screen-"]:not(#screen-hub):not(.hidden),
+  #rd-play:not(.hidden),
+  #sdk-play:not(.hidden),
+  #carrom-play:not(.hidden) {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Shared: reduce top padding (no universal topbar in landscape) ── */
+  [style*="padding-top:54px"],
+  [style*="padding-top: 54px"] {
+    padding-top: 8px !important;
+  }
+
+  /* ══ REACTION DUEL ════════════════════════════════════════════ */
+
+  #rd-play:not(.hidden) {
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    gap: 12px;
+    overflow-y: hidden !important;
+  }
+
+  /* Heading hidden in landscape to save space */
+  #rd-play:not(.hidden) > div:first-child {
+    display: none !important;
+  }
+
+  /* Scores panel — left column */
+  #rd-play:not(.hidden) > div:nth-child(2) {
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 100px;
+    gap: 8px !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Signal circle — shrink for landscape */
+  #rd-signal-bg {
+    width: 140px !important;
+    height: 140px !important;
+    margin-bottom: 8px !important;
+    flex-shrink: 0;
+  }
+
+  #rd-signal-emoji { font-size: 2.8rem !important; }
+  #rd-signal-text  { font-size: 1rem !important; }
+  #rd-status       { font-size: 0.85rem !important; margin-bottom: 8px !important; }
+
+  /* Tap buttons — right column, stacked vertically */
+  #rd-play:not(.hidden) > div:last-of-type {
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  #rd-tap-p1, #rd-tap-p2 {
+    width: 110px !important;
+    height: 56px !important;
+    font-size: 0.9rem !important;
+  }
+
+
+  /* ══ AIR HOCKEY ══════════════════════════════════════════════ */
+
+  #ah-play-panel {
+    padding-top: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    height: 100dvh;
+    box-sizing: border-box;
+    overflow: hidden !important;
+  }
+
+  .ah-scorebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 4px 12px !important;
+    flex-shrink: 0;
+  }
+
+  #ah-canvas-field {
+    flex: 1 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  #ah-canvas {
+    max-height: calc(100dvh - 70px) !important;
+    width: auto !important;
+    height: 100% !important;
+    max-width: 100% !important;
+  }
+
+
+  /* ══ PING PONG ════════════════════════════════════════════════ */
+
+  #pp-wrap {
+    height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  #pp-header {
+    flex-shrink: 0;
+    padding: 4px 8px !important;
+  }
+
+  #pp-canvas-wrap {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  #pp-canvas {
+    max-height: calc(100dvh - 80px) !important;
+    height: 100% !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  #pp-mobile-controls {
+    flex-shrink: 0;
+    padding: 4px !important;
+  }
+
+
+  /* ══ CHESS ════════════════════════════════════════════════════ */
+
+  #screen-chess:not(.hidden) {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 8px 12px !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  #chess-board-wrap {
+    flex: 0 0 auto !important;
+    max-width: min(calc(100dvh - 24px), 50vw) !important;
+    width: min(calc(100dvh - 24px), 50vw) !important;
+  }
+
+  #chess-board-container,
+  .chess-board-wrap {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Chess info/controls panel — right side */
+  #chess-info-panel,
+  #chess-controls,
+  .chess-side-panel {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    max-height: 100dvh !important;
+    padding: 8px !important;
+  }
+
+  .chess-square {
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+
+  /* ══ CHECKERS ════════════════════════════════════════════════ */
+
+  #ck-game-area {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 8px !important;
+    height: calc(100dvh - 50px) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  #ck-board-wrap {
+    flex: 0 0 auto !important;
+    max-width: min(calc(100dvh - 60px), 52vw) !important;
+    width: min(calc(100dvh - 60px), 52vw) !important;
+    overflow: visible !important;
+  }
+
+  #checkers-canvas {
+    max-height: calc(100dvh - 60px) !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  #ck-score-left,
+  #ck-score-right {
+    flex-direction: column !important;
+    align-items: center !important;
+    font-size: 0.82rem !important;
+  }
+
+
+  /* ══ DARTS ════════════════════════════════════════════════════ */
+
+  #darts-app {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    padding: 8px !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  #darts-header { display: none !important; }
+
+  #darts-score-bar {
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    width: 120px !important;
+    align-self: stretch !important;
+    justify-content: center !important;
+    gap: 8px !important;
+  }
+
+  #darts-canvas-wrap {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  #darts-board {
+    max-height: calc(100dvh - 16px) !important;
+    max-width: 100% !important;
+    width: auto !important;
+    height: calc(100dvh - 16px) !important;
+  }
+
+  .darts-player-score {
+    font-size: 0.8rem !important;
+    padding: 6px !important;
+  }
+
+  .darts-score-num { font-size: 1.6rem !important; }
+
+
+  /* ══ BATTLESHIP ══════════════════════════════════════════════ */
+
+  #bs-app {
+    padding-top: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+  }
+
+  #bs-header { flex-shrink: 0; padding: 4px 8px !important; }
+  #bs-header h1 { font-size: 1rem !important; margin: 0 !important; }
+
+  .bs-grids-row,
+  #bs-game-area {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  #bs-placement-grid,
+  #bs-attack-grid {
+    max-width: min(44vw, 280px) !important;
+    width: min(44vw, 280px) !important;
+    margin: 0 !important;
+  }
+
+  .bs-grid-label { font-size: 0.72rem !important; }
+
+
+  /* ══ LUDO ════════════════════════════════════════════════════ */
+
+  #ludo-app {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    padding: 8px 10px !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    gap: 10px !important;
+  }
+
+  #ludo-bwrap {
+    flex: 0 0 auto !important;
+    width: min(calc(100dvh - 16px), 55vw) !important;
+    height: min(calc(100dvh - 16px), 55vw) !important;
+  }
+
+  #ludo-cv {
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Ludo side controls */
+  #ludo-sbar,
+  #ludo-drow,
+  #ludo-msg {
+    font-size: 0.78rem !important;
+  }
+
+
+  /* ══ SUDOKU ══════════════════════════════════════════════════ */
+
+  #sdk-play:not(.hidden) {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    padding: 8px 12px !important;
+    gap: 12px !important;
+    overflow-y: hidden !important;
+    justify-content: center !important;
+  }
+
+  /* Sudoku grid — left side */
+  #sdk-play:not(.hidden) > div:first-child {
+    flex: 0 0 auto !important;
+    max-width: min(calc(100dvh - 16px), 50vw) !important;
+  }
+
+  /* Number pad — right side */
+  #sdk-numpad,
+  #sdk-controls {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    align-self: center !important;
+  }
+
+  .sdk-cell { font-size: clamp(0.7rem, 2.2vw, 1rem) !important; }
+
+}
+/* end landscape game layouts */
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 13b  TETRIS LANDSCAPE LAYOUT
+         When .tetris-landscape class is added by JS on rotation,
+         switch to a full-viewport side-by-side layout.
+   ══════════════════════════════════════════════════════════════ */
+
+/* tetris-play in landscape: full-screen row layout */
+#tetris-play.tetris-landscape {
+  flex-direction: column !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  justify-content: flex-start !important;
+}
+
+/* Heading: hide the big title in landscape to save vertical space */
+#tetris-play.tetris-landscape #tetris-heading {
+  display: none !important;
+}
+
+/* Players wrap: side-by-side row in landscape */
+#tetris-play.tetris-landscape #tetris-players-wrap {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  height: calc(100dvh - 54px) !important; /* leave room for universal topbar */
+  padding: 4px 8px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Each player column: no max-width cap in landscape */
+#tetris-play.tetris-landscape #tetris-players-wrap > div {
+  max-width: none !important;
+  flex-shrink: 0 !important;
+  gap: 3px !important;
+}
+
+/* Score row: more compact in landscape */
+#tetris-play.tetris-landscape #tetris-players-wrap > div > div[style*="font-size:0.75rem"] {
+  font-size: 0.62rem !important;
+  gap: 4px !important;
+}
+
+/* Canvases: let JS control dimensions — no CSS caps */
+#tetris-play.tetris-landscape #tetris-canvas-p1,
+#tetris-play.tetris-landscape #tetris-canvas-p2 {
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+}
+
+/* Next piece previews: smaller in landscape */
+#tetris-play.tetris-landscape #tetris-next-p1,
+#tetris-play.tetris-landscape #tetris-next-p2 {
+  max-width: none !important;
+  width: auto !important;
+}
+
+/* P2 keyboard hint: hide in landscape (no room) */
+#tetris-play.tetris-landscape #tetris-p2-keys {
+  display: none !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   § 14  LANDSCAPE LAYOUT FOR ALL REMAINING GAMES
+         Each game gets a two-column or optimised layout in
+         landscape orientation on mobile devices.
+   ══════════════════════════════════════════════════════════════ */
+
+@media (orientation: landscape) and (max-height: 600px) {
+
+  /* ── Shared: reduce padding-top for topbar in all game apps ── */
+  #ttt-app, #rps-app, #c4-app, #bs-app, #ck-app,
+  #darts-app, #mfd-app, #cdd-app, #d2048-header,
+  #mfd-header, #cdd-header, #chess-app,
+  #pp-score-row, #ludo-app, #sdk-play > div {
+    padding-top: 48px !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     TIC TAC TOE — compact single column
+  ───────────────────────────────────────────────────────────── */
+  #ttt-app {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 48px 12px 8px !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  /* Board left, controls right */
+  #ttt-app #board {
+    flex-shrink: 0 !important;
+    width: min(42vw, 200px) !important;
+    height: min(42vw, 200px) !important;
+  }
+  #ttt-app .cell {
+    font-size: clamp(1.4rem, 5vw, 2rem) !important;
+  }
+  /* Right column: header + scores + status + restart */
+  #ttt-app #scorecards,
+  #ttt-app #status-wrap,
+  #ttt-app #mode-selector,
+  #ttt-app #difficulty-selector,
+  #ttt-app #restart,
+  #ttt-app #ttt-header {
+    flex-shrink: 1 !important;
+  }
+  #ttt-app #ttt-header h2 { font-size: 1rem !important; margin: 0 !important; }
+  #ttt-app #ttt-header p  { font-size: 0.65rem !important; margin: 0 !important; }
+  #ttt-app #status-wrap p  { font-size: 0.8rem !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     ROCK PAPER SCISSORS — choices side by side
+  ───────────────────────────────────────────────────────────── */
+  #rps-app {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 8px 16px !important;
+    padding: 48px 12px 8px !important;
+    overflow-y: auto !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+  }
+  #rps-app .game-header     { width: 100% !important; margin: 0 !important; }
+  #rps-app .game-header h2  { font-size: 1rem !important; }
+  #rps-app #rps-scorecards  { flex: 1 1 auto !important; }
+  #rps-app #rps-buttons-p1,
+  #rps-app #rps-buttons-p2  { flex: 1 1 auto !important; }
+  #rps-app .rps-btn-row     { gap: 6px !important; }
+  #rps-app .rps-btn         { padding: 6px 10px !important; font-size: 1.2rem !important; }
+  #rps-app #rps-choices-display { gap: 12px !important; }
+  #rps-app .rps-choice-emoji    { font-size: 2rem !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     2048 DUEL — boards side by side (already somewhat so)
+  ───────────────────────────────────────────────────────────── */
+  #d2048-play-panel {
+    overflow-y: auto !important;
+    height: 100dvh !important;
+    box-sizing: border-box !important;
+  }
+  #d2048-header { padding-top: 48px !important; }
+  #d2048-header .game-title { font-size: 1rem !important; margin: 2px 0 !important; }
+  #d2048-boards-wrap,
+  #d2048-play-panel > div[style*="display:flex"] {
+    flex-direction: row !important;
+    gap: 10px !important;
+    justify-content: center !important;
+  }
+  .d2048-board { max-width: min(42vw, 200px) !important; }
+  .d2048-tile  { font-size: clamp(0.7rem, 2.5vw, 1rem) !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONNECT FOUR — board compact, player bar slim
+  ───────────────────────────────────────────────────────────── */
+  #c4-app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 48px 8px 4px !important;
+    box-sizing: border-box !important;
+  }
+  #c4-game-header { display: none !important; }
+  #c4-player-bar  { padding: 4px 0 !important; gap: 8px !important; }
+  #c4-status-wrap { min-height: 20px !important; font-size: 0.75rem !important; }
+  #c4-board-wrap  { flex: 1 !important; min-height: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+  #c4-board       { gap: 3px !important; }
+  .c4-cell        { width: clamp(28px, 7vw, 42px) !important; height: clamp(28px, 7vw, 42px) !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     CRICKET — row layout: scores left, controls right
+  ───────────────────────────────────────────────────────────── */
+  #cricket-play {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 48px 12px 8px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+  .cricket-scoreboard  { flex-shrink: 0 !important; width: 40% !important; }
+  .cricket-info-bar    { font-size: 0.72rem !important; }
+  .cricket-reveal-row  { flex: 1 !important; }
+  .cricket-hand-btn    { min-height: 44px !important; font-size: 1.2rem !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     PASSWORD BREAKER — scrollable, compact header
+  ───────────────────────────────────────────────────────────── */
+  #pb-play-panel {
+    overflow-y: auto !important;
+    max-height: 100dvh !important;
+    box-sizing: border-box !important;
+  }
+  .pb-topbar { min-height: 40px !important; }
+  .pb-hud    { gap: 8px !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     MEMORY FLIP — board + scores in row
+  ───────────────────────────────────────────────────────────── */
+  #mfd-app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 48px 8px 4px !important;
+    box-sizing: border-box !important;
+  }
+  #mfd-header   { padding-top: 0 !important; }
+  #mfd-header h2 { font-size: 0.95rem !important; margin: 0 !important; }
+  #mfd-scoreboard { flex-shrink: 0 !important; }
+  .mfd-board    {
+    flex: 1 !important;
+    max-width: min(90vw, 400px) !important;
+    max-height: calc(100dvh - 110px) !important;
+    margin: 0 auto !important;
+  }
+  .mfd-card     { aspect-ratio: 1 !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONNECT DOTS — compact board
+  ───────────────────────────────────────────────────────────── */
+  #cdd-app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 48px 8px 4px !important;
+    box-sizing: border-box !important;
+  }
+  #cdd-header { padding-top: 0 !important; }
+  #cdd-header h2 { font-size: 0.95rem !important; margin: 0 !important; }
+  #cdd-board  {
+    max-width: min(85vw, 360px) !important;
+    max-height: calc(100dvh - 100px) !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     CHESS — board left, sidebar right
+  ───────────────────────────────────────────────────────────── */
+  #chess-play-wrap,
+  #screen-chess > div:not(.game-home-panel) {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    padding: 48px 8px 4px !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+  #chess-board-container,
+  .chess-board-wrap,
+  #chess-board-wrap {
+    max-width: min(55vw, 320px) !important;
+    flex-shrink: 0 !important;
+  }
+  #chess-sidebar {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    max-height: calc(100dvh - 56px) !important;
+    font-size: 0.72rem !important;
+  }
+  #chess-controls {
+    flex-shrink: 0 !important;
+    gap: 4px !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     BATTLESHIP — grids side by side (already mostly so)
+  ───────────────────────────────────────────────────────────── */
+  #bs-app {
+    overflow-y: auto !important;
+    max-height: 100dvh !important;
+    padding: 48px 8px 8px !important;
+    box-sizing: border-box !important;
+  }
+  #bs-boards {
+    flex-direction: row !important;
+    gap: 10px !important;
+    justify-content: center !important;
+  }
+  .bs-board-wrap  { flex: 1 !important; max-width: 46% !important; }
+  #bs-player-grid,
+  #bs-attack-grid { max-width: 100% !important; }
+
+  /* ─────────────────────────────────────────────────────────────
+     CHECKERS — board compact
+  ───────────────────────────────────────────────────────────── */
+  #ck-app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 48px 8px 4px !important;
+    box-sizing: border-box !important;
+  }
+  #ck-header    { flex-shrink: 0 !important; }
+  #ck-header h1 { font-size: 1rem !important; }
+  #ck-game-area {
+    flex: 1 !important;
+    min-height: 0 !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 10px !important;
+  }
+  #ck-board-wrap {
+    max-width: min(55vw, 280px) !important;
+    flex-shrink: 0 !important;
+  }
+  #checkers-canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: calc(100dvh - 80px) !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     DARTS — scorebar top, board fills remaining height
+  ───────────────────────────────────────────────────────────── */
+  #darts-app {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 48px 8px 4px !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
+  }
+  #darts-header  { display: none !important; }
+  #darts-score-bar {
+    flex-direction: column !important;
+    flex-shrink: 0 !important;
+    width: 30% !important;
+    gap: 6px !important;
+  }
+  .darts-player-score { width: 100% !important; }
+  .darts-score-num    { font-size: 1.6rem !important; }
+  #darts-turn-badge   { flex-direction: column !important; font-size: 0.7rem !important; }
+  #darts-canvas-wrap  {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+  #darts-board {
+    max-height: calc(100dvh - 60px) !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     PING PONG — canvas fills landscape height
+  ───────────────────────────────────────────────────────────── */
+  #pp-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+  }
+  #pp-score-row {
+    padding-top: 48px !important;
+    flex-shrink: 0 !important;
+    padding-bottom: 4px !important;
+  }
+  #pp-canvas-wrap {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  #pp-canvas {
+    max-height: calc(100dvh - 80px) !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     AIR HOCKEY — canvas fills landscape
+  ───────────────────────────────────────────────────────────── */
+  #ah-play-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding-top: 0 !important;
+  }
+  .ah-scorebar {
+    flex-shrink: 0 !important;
+    padding-top: 48px !important;
+  }
+  .ah-canvas-wrap,
+  #ah-canvas-field {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  #ah-canvas {
+    max-height: calc(100dvh - 90px) !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     LUDO — board centred, smaller size in landscape
+  ───────────────────────────────────────────────────────────── */
+  #ludo-play {
+    height: 100dvh !important;
+    overflow-y: auto !important;
+  }
+  #ludo-app {
+    padding: 48px 8px 8px !important;
+    max-width: 100% !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     SUDOKU — scrollable, compact grid
+  ───────────────────────────────────────────────────────────── */
+  #sdk-play {
+    overflow-y: auto !important;
+  }
+  #sdk-play > div {
+    padding-top: 48px !important;
+  }
+  .sdk-grid {
+    max-width: min(55vw, 280px) !important;
+    margin: 0 auto !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     REACTION DUEL — signal + buttons side by side
+  ───────────────────────────────────────────────────────────── */
+  #rd-play {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    padding: 48px 16px 8px !important;
+    overflow: hidden !important;
+  }
+  /* Heading hidden in landscape */
+  #rd-play > div:first-of-type {
+    display: none !important;
+  }
+  #rd-signal-bg {
+    width: min(36vw, 180px) !important;
+    height: min(36vw, 180px) !important;
+    flex-shrink: 0 !important;
+  }
+  #rd-signal-emoji { font-size: 2.5rem !important; }
+  #rd-signal-text  { font-size: 1rem !important; }
+  /* Scores + status + tap buttons column */
+  #rd-play > div:last-of-type {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+} /* end §14 @media landscape max-height:600px */
